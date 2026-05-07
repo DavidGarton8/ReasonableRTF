@@ -567,23 +567,14 @@ public sealed partial class RtfToTextConverter
                 }
                 else if (equals != Vector512<byte>.Zero)
                 {
-                    ulong notEqualsElements = equals.ExtractMostSignificantBits();
-                    int index = BitOperations.TrailingZeroCount(notEqualsElements);
-                    if (index >= Vector256<byte>.Count)
-                    {
-                        Vector256<byte> current256 = current.GetLower();
-                        CopyVector256(current256, plainText, ref currentPos);
-                    }
-                    else if (index >= Vector128<byte>.Count)
-                    {
-                        Vector128<byte> current128 = current.GetLower().GetLower();
-                        CopyVector128(current128, plainText, ref currentPos);
-                    }
+                    int index = BitOperations.TrailingZeroCount(equals.ExtractMostSignificantBits());
+                    if (index == 0) return;
+                    CopyVector512(current, plainText, ref currentPos, index);
                     return;
                 }
                 else
                 {
-                    CopyVector512(current, plainText, ref currentPos);
+                    CopyVector512(current, plainText, ref currentPos, Vector512<byte>.Count);
                 }
 
                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector512<byte>.Count);
@@ -662,18 +653,14 @@ public sealed partial class RtfToTextConverter
                 }
                 else if (equals != Vector256<byte>.Zero)
                 {
-                    uint notEqualsElements = equals.ExtractMostSignificantBits();
-                    int index = BitOperations.TrailingZeroCount(notEqualsElements);
-                    if (index >= Vector128<byte>.Count)
-                    {
-                        Vector128<byte> current128 = current.GetLower();
-                        CopyVector128(current128, plainText, ref currentPos);
-                    }
+                    int index = BitOperations.TrailingZeroCount(equals.ExtractMostSignificantBits());
+                    if (index == 0) return;
+                    CopyVector256(current, plainText, ref currentPos, index);
                     return;
                 }
                 else
                 {
-                    CopyVector256(current, plainText, ref currentPos);
+                    CopyVector256(current, plainText, ref currentPos, Vector256<byte>.Count);
                 }
 
                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector256<byte>.Count);
@@ -752,11 +739,14 @@ public sealed partial class RtfToTextConverter
                 }
                 else if (equals != Vector128<byte>.Zero)
                 {
+                    int index = BitOperations.TrailingZeroCount(equals.ExtractMostSignificantBits());
+                    if (index == 0) return;
+                    CopyVector128(current, plainText, ref currentPos, index);
                     return;
                 }
                 else
                 {
-                    CopyVector128(current, plainText, ref currentPos);
+                    CopyVector128(current, plainText, ref currentPos, Vector128<byte>.Count);
                 }
 
                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector128<byte>.Count);
@@ -770,7 +760,7 @@ public sealed partial class RtfToTextConverter
         return;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void CopyVector512(Vector512<byte> current, ListFast<char> plainText, ref int currentPos)
+        static void CopyVector512(Vector512<byte> current, ListFast<char> plainText, ref int currentPos, int length)
         {
             (Vector512<ushort> lower, Vector512<ushort> upper) = Vector512.Widen(current);
 
@@ -783,13 +773,13 @@ public sealed partial class RtfToTextConverter
             Unsafe.WriteUnaligned(ref Unsafe.As<char, byte>(ref plainTextArray[plainTextCount]), lower);
             Unsafe.WriteUnaligned(ref Unsafe.As<char, byte>(ref plainTextArray[plainTextCount + (Vector512<byte>.Count / 2)]), upper);
 
-            plainText.Count += Vector512<byte>.Count;
+            plainText.Count += length;
 
-            currentPos += Vector512<byte>.Count;
+            currentPos += length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void CopyVector256(Vector256<byte> current, ListFast<char> plainText, ref int currentPos)
+        static void CopyVector256(Vector256<byte> current, ListFast<char> plainText, ref int currentPos, int length)
         {
             (Vector256<ushort> lower, Vector256<ushort> upper) = Vector256.Widen(current);
 
@@ -802,13 +792,13 @@ public sealed partial class RtfToTextConverter
             Unsafe.WriteUnaligned(ref Unsafe.As<char, byte>(ref plainTextArray[plainTextCount]), lower);
             Unsafe.WriteUnaligned(ref Unsafe.As<char, byte>(ref plainTextArray[plainTextCount + (Vector256<byte>.Count / 2)]), upper);
 
-            plainText.Count += Vector256<byte>.Count;
+            plainText.Count += length;
 
-            currentPos += Vector256<byte>.Count;
+            currentPos += length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void CopyVector128(Vector128<byte> current, ListFast<char> plainText, ref int currentPos)
+        static void CopyVector128(Vector128<byte> current, ListFast<char> plainText, ref int currentPos, int length)
         {
             (Vector128<ushort> lower, Vector128<ushort> upper) = Vector128.Widen(current);
 
@@ -821,9 +811,9 @@ public sealed partial class RtfToTextConverter
             Unsafe.WriteUnaligned(ref Unsafe.As<char, byte>(ref plainTextArray[plainTextCount]), lower);
             Unsafe.WriteUnaligned(ref Unsafe.As<char, byte>(ref plainTextArray[plainTextCount + (Vector128<byte>.Count / 2)]), upper);
 
-            plainText.Count += Vector128<byte>.Count;
+            plainText.Count += length;
 
-            currentPos += Vector128<byte>.Count;
+            currentPos += length;
         }
     }
 
