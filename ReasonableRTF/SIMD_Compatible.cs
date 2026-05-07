@@ -362,12 +362,26 @@ public sealed partial class RtfToTextConverter
                     Vector.Equals(_openBraceVector, current) |
                     Vector.Equals(_closingBraceVector, current);
 
-                if (!Vector<byte>.Zero.Equals(equals))
+                int index = LocateFirstFoundByte_VectorCountOnFail(equals);
+
+                if (index == 0)
                 {
                     return;
                 }
 
-                CopyVector(current, plainText, ref currentPos);
+                Vector.Widen(current, out Vector<ushort> lower, out Vector<ushort> upper);
+
+                plainText.EnsureCapacity(plainText.Count + Vector<byte>.Count);
+                lower.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count);
+                upper.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count + (Vector<byte>.Count / 2));
+
+                plainText.Count += index;
+                currentPos += index;
+
+                if (index < Vector<byte>.Count)
+                {
+                    return;
+                }
 
                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
             } while (!Unsafe.IsAddressGreaterThan(ref currentSearchSpace, ref oneVectorAwayFromEnd));
@@ -376,23 +390,6 @@ public sealed partial class RtfToTextConverter
         // I think Vector128 should be supported on literally anything these days, but if it's not, just fall out
         // without doing anything and we'll take the non-SIMD path. We don't fall back to Vector64 because that's
         // slower than just doing the 8 bytes scalar.
-
-        return;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void CopyVector(Vector<byte> current, ListFast<char> plainText, ref int currentPos)
-        {
-            Vector.Widen(current, out Vector<ushort> lower, out Vector<ushort> upper);
-
-            plainText.EnsureCapacity(plainText.Count + Vector<byte>.Count);
-
-            lower.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count);
-            upper.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count + (Vector<byte>.Count / 2));
-
-            plainText.Count += Vector<byte>.Count;
-
-            currentPos += Vector<byte>.Count;
-        }
     }
 
     #endregion
@@ -431,6 +428,25 @@ public sealed partial class RtfToTextConverter
 
         // Single LEA instruction with jitted const (using function result)
         return i * 8 + LocateFirstFoundByte(candidate);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int LocateFirstFoundByte_VectorCountOnFail(Vector<byte> match)
+    {
+        Vector<ulong> vector64 = Vector.AsVectorUInt64(match);
+        int i = 0;
+        // Pattern unrolled by jit https://github.com/dotnet/coreclr/pull/8001
+        for (; i < Vector<ulong>.Count; i++)
+        {
+            ulong candidate = vector64[i];
+            if (candidate != 0)
+            {
+                // Single LEA instruction with jitted const (using function result)
+                return i * 8 + LocateFirstFoundByte(candidate);
+            }
+        }
+
+        return Vector<byte>.Count;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
