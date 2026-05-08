@@ -303,6 +303,34 @@ public sealed partial class RtfToTextConverter
 
     private readonly uint[][] _symbolFontTables = new uint[_symbolArraysLength][];
     private readonly byte[][] _symbolFontCharsArrays = new byte[_symbolArraysLength][];
+    private const int _minSupportedSymbolFontNameLength = 6;
+    private const int _maxSupportedSymbolFontNameLength = 17;
+
+#if NET8_0_OR_GREATER
+    private static ReadOnlySpan<bool> _symbolFontNameLengths =>
+#else
+    private static readonly bool[] _symbolFontNameLengths =
+#endif
+    [
+        false, // 0
+        false, // 1
+        false, // 2
+        false, // 3
+        false, // 4
+        false, // 5
+        true,  // 6
+        false, // 7
+        true,  // 8
+        true,  // 9
+        false, // 10
+        true,  // 11
+        false, // 12
+        true,  // 13
+        false, // 14
+        false, // 15
+        false, // 16
+        true,  // 17
+    ];
 
     private void InitSymbolFontData()
     {
@@ -1713,6 +1741,8 @@ public sealed partial class RtfToTextConverter
         _symbolFontCharsArrays[(int)SymbolFont.Webdings] = "Webdings"u8.ToArray();
         _symbolFontCharsArrays[(int)SymbolFont.ITCZapfDingbats] = "ITC Zapf Dingbats"u8.ToArray();
         _symbolFontCharsArrays[(int)SymbolFont.ZapfDingbats] = "Zapf Dingbats"u8.ToArray();
+
+        InitSymbolFontNameVectors();
     }
 
     #endregion
@@ -1878,7 +1908,7 @@ public sealed partial class RtfToTextConverter
 
     private readonly ListFast<char> _unicodeBuffer;
 
-    private readonly char[] _symbolFontNameBuffer = new char[_maxSymbolFontNameLength];
+    private readonly byte[] _symbolFontNameBuffer = new byte[_maxSymbolFontNameLength];
 
     private bool _inFontTable;
 
@@ -2484,66 +2514,9 @@ public sealed partial class RtfToTextConverter
                             // save time here...
                             currentFontAcquired && currentFontSymbolFont == SymbolFont.Unset)
                         {
-                            bool isNonSemicolonSeparatorChar = false;
-                            int symbolFontNameCount;
-                            if (_currentPos < _currentBufferChunkLength - (_maxSymbolFontNameLength + 1))
-                            {
-                                for (symbolFontNameCount = 0;
-                                     symbolFontNameCount < _maxSymbolFontNameLength &&
-                                       ch != ';' &&
-                                       !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]);
-                                     symbolFontNameCount++, ch = (char)_buffer[IncrementCurrentPos()])
-                                {
-                                    _symbolFontNameBuffer[symbolFontNameCount] = ch;
-                                }
-                            }
-                            else
-                            {
-                                for (symbolFontNameCount = 0;
-                                     symbolFontNameCount < _maxSymbolFontNameLength &&
-                                     ch != ';' &&
-                                     !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]);
-                                     symbolFontNameCount++, ch = (char)GetByte(IncrementCurrentPos()))
-                                {
-                                    _symbolFontNameBuffer[symbolFontNameCount] = ch;
-                                }
-                            }
-
-                            if (symbolFontNameCount == _maxSymbolFontNameLength)
-                            {
-                                while (ch != ';' && !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]))
-                                {
-                                    ch = (char)GetByte(IncrementCurrentPos());
-                                }
-                            }
-
-                            /*
-                            Support weird nonsense in the font table like:
-
-                            {Zapf Dingbats{\*\falt Monotype Sorts};}
-
-                            where we should stop at the { instead of the ; so we get the name right.
-
-                            Also whatever nonsense is going on in some of those RtfPipe test files.
-                            */
-                            if (isNonSemicolonSeparatorChar)
-                            {
-                                _currentPos--;
-                            }
-
-                            for (int i = _symbolArraysStartingIndex; i < _symbolArraysLength; i++)
-                            {
-                                byte[] nameBytes = _symbolFontCharsArrays[i];
-                                if (FontName_SeqEqual(_symbolFontNameBuffer, nameBytes, symbolFontNameCount))
-                                {
-                                    currentFontSymbolFont = (SymbolFont)i;
-                                    break;
-                                }
-                            }
-                            if (currentFontSymbolFont == SymbolFont.Unset)
-                            {
-                                currentFontSymbolFont = SymbolFont.None;
-                            }
+                            currentFontSymbolFont = ShouldUseSimdFontNameCodePath()
+                                ? SIMD_TryGetFontName(_buffer, ch, ref _currentPos)
+                                : GetSymbolFont_Scalar(ch);
 
                             if (currentFontNumber != NoFontNumber)
                             {
@@ -2569,9 +2542,82 @@ public sealed partial class RtfToTextConverter
 
         _inFontTable = false;
         return RtfError.OK;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool ShouldUseSimdFontNameCodePath()
+    {
+#if NET8_0_OR_GREATER
+        return (System.Runtime.Intrinsics.Vector512.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (System.Runtime.Intrinsics.Vector512<byte>.Count + 1)) ||
+               (System.Runtime.Intrinsics.Vector256.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (System.Runtime.Intrinsics.Vector256<byte>.Count + 1)) ||
+               (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (System.Runtime.Intrinsics.Vector128<byte>.Count + 1));
+#else
+        return System.Numerics.Vector.IsHardwareAccelerated && _vectorLengthFitsInAByte && _currentPos < _currentBufferChunkLength - (System.Numerics.Vector<byte>.Count + 1);
+#endif
+    }
+
+    private SymbolFont GetSymbolFont_Scalar(char ch, int symbolFontNameCountStart = 0)
+    {
+        int symbolFontNameCount;
+        bool isNonSemicolonSeparatorChar = false;
+        if (_currentPos < _currentBufferChunkLength - (_maxSymbolFontNameLength + 1))
+        {
+            for (symbolFontNameCount = symbolFontNameCountStart;
+                 symbolFontNameCount < _maxSymbolFontNameLength &&
+                 ch != ';' &&
+                 !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]);
+                 symbolFontNameCount++, ch = (char)_buffer[IncrementCurrentPos()])
+            {
+                _symbolFontNameBuffer[symbolFontNameCount] = (byte)ch;
+            }
+        }
+        else
+        {
+            for (symbolFontNameCount = symbolFontNameCountStart;
+                 symbolFontNameCount < _maxSymbolFontNameLength &&
+                 ch != ';' &&
+                 !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]);
+                 symbolFontNameCount++, ch = (char)GetByte(IncrementCurrentPos()))
+            {
+                _symbolFontNameBuffer[symbolFontNameCount] = (byte)ch;
+            }
+        }
+
+        if (symbolFontNameCount == _maxSymbolFontNameLength)
+        {
+            while (ch != ';' && !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]))
+            {
+                ch = (char)GetByte(IncrementCurrentPos());
+            }
+        }
+
+        /*
+        Support weird nonsense in the font table like:
+
+        {Zapf Dingbats{\*\falt Monotype Sorts};}
+
+        where we should stop at the { instead of the ; so we get the name right.
+
+        Also whatever nonsense is going on in some of those RtfPipe test files.
+        */
+        if (isNonSemicolonSeparatorChar)
+        {
+            _currentPos--;
+        }
+
+        for (int i = _symbolArraysStartingIndex; i < _symbolArraysLength; i++)
+        {
+            byte[] nameBytes = _symbolFontCharsArrays[i];
+            if (FontName_SeqEqual(_symbolFontNameBuffer, nameBytes, symbolFontNameCount))
+            {
+                return (SymbolFont)i;
+            }
+        }
+
+        return SymbolFont.None;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool FontName_SeqEqual(char[] first, byte[] second, int firstLength)
+        static bool FontName_SeqEqual(byte[] first, byte[] second, int firstLength)
         {
             if (firstLength != second.Length) return false;
 

@@ -46,6 +46,7 @@ public sealed partial class RtfToTextConverter
     private static readonly Vector512<byte> _openBraceVector512 = Vector512.Create((byte)'{');
     private static readonly Vector512<byte> _closingBraceVector512 = Vector512.Create((byte)'}');
     private static readonly Vector512<byte> _nVector512 = Vector512.Create((byte)'n');
+    private static readonly Vector512<byte> _semicolonVector512 = Vector512.Create((byte)';');
     // CreateSequence() was introduced in .NET 9, so since we support 8, we need to do it manually for now.
     private static readonly Vector512<byte> _indexVec_512 = Vector512.Create(
         (byte)
@@ -62,6 +63,7 @@ public sealed partial class RtfToTextConverter
     private static readonly Vector256<byte> _openBraceVector256 = Vector256.Create((byte)'{');
     private static readonly Vector256<byte> _closingBraceVector256 = Vector256.Create((byte)'}');
     private static readonly Vector256<byte> _nVector256 = Vector256.Create((byte)'n');
+    private static readonly Vector256<byte> _semicolonVector256 = Vector256.Create((byte)';');
     private static readonly Vector256<byte> _indexVec_256 = Vector256.Create(
         (byte)
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
@@ -75,6 +77,7 @@ public sealed partial class RtfToTextConverter
     private static readonly Vector128<byte> _openBraceVector128 = Vector128.Create((byte)'{');
     private static readonly Vector128<byte> _closingBraceVector128 = Vector128.Create((byte)'}');
     private static readonly Vector128<byte> _nVector128 = Vector128.Create((byte)'n');
+    private static readonly Vector128<byte> _semicolonVector128 = Vector128.Create((byte)';');
     private static readonly Vector128<byte> _indexVec_128 = Vector128.Create(
         (byte)
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15

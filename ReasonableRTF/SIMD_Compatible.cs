@@ -44,6 +44,7 @@ public sealed partial class RtfToTextConverter
     private static readonly Vector<byte> _openBraceVector = new((byte)'{');
     private static readonly Vector<byte> _closingBraceVector = new((byte)'}');
     private static readonly Vector<byte> _nVector = new((byte)'n');
+    private static readonly Vector<byte> _semicolonVector = new((byte)';');
 
     private const ulong XorPowerOfTwoToHighByte = (0x07ul |
                                                    0x06ul << 8 |

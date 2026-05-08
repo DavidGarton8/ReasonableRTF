@@ -1,8 +1,8 @@
 ﻿#if NET8_0_OR_GREATER
+using System.Numerics;
 using System.Runtime.Intrinsics;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
-using ReasonableRTF.Helper;
 using ReasonableRTF.Models.Symbols;
 
 namespace ReasonableRTF;
@@ -44,10 +44,7 @@ public sealed partial class RtfToTextConverter
             Vector128<byte> asciiLetters = Vector128.GreaterThan((keyword | _hex20_128) - _all_a_128, _z_minus_a_128);
 
             uint notEqualsElements = asciiLetters.ExtractMostSignificantBits();
-            byte keywordCount = (byte)UtilHelper.Vector128_TrailingZeroCount(notEqualsElements);
-
-            Vector128<byte> maskVec = Vector128.GreaterThan(Vector128.Create(keywordCount), _indexVec_128);
-            keyword = Vector128.BitwiseAnd(keyword, maskVec);
+            byte keywordCount = (byte)BitOperations.TrailingZeroCount(notEqualsElements);
 
             // 99.9% of keywords in the test set (849,098 out of 849,948) are less than 16 chars long, so this
             // slightly inefficient fallback path will hardly ever be hit.
@@ -56,6 +53,9 @@ public sealed partial class RtfToTextConverter
                 _currentPos = startingCurrentPos;
                 return RtfError.KeywordTooLong;
             }
+
+            Vector128<byte> maskVec = Vector128.GreaterThan(Vector128.Create(keywordCount), _indexVec_128);
+            keyword = Vector128.BitwiseAnd(keyword, maskVec);
 
             _currentPos += keywordCount;
             ch = (char)_buffer[_currentPos - 1];
