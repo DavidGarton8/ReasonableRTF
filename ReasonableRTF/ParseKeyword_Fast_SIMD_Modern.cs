@@ -1,9 +1,9 @@
 ﻿#if NET8_0_OR_GREATER
 
-using System.Numerics;
 using System.Runtime.Intrinsics;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
+using ReasonableRTF.Helper;
 using ReasonableRTF.Models.Symbols;
 
 namespace ReasonableRTF;
@@ -54,7 +54,7 @@ public sealed partial class RtfToTextConverter
             Vector128<byte> asciiLetters = Vector128.GreaterThan((keyword | _hex20_128) - _all_a_128, _z_minus_a_128);
 
             uint notEqualsElements = asciiLetters.ExtractMostSignificantBits();
-            byte keywordCount = (byte)BitOperations.TrailingZeroCount(notEqualsElements);
+            byte keywordCount = (byte)UtilHelper.Vector128_TrailingZeroCount(notEqualsElements);
 
             Vector128<byte> maskVec = Vector128.GreaterThan(Vector128.Create(keywordCount), _indexVec_128);
             keyword = Vector128.BitwiseAnd(keyword, maskVec);

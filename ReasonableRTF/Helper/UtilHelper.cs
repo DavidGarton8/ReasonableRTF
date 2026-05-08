@@ -131,4 +131,20 @@ internal static class UtilHelper
         */
         return (uint)(value - ushort.MinValue) <= (RtfToTextConverter.NoCodePage - 1) - ushort.MinValue;
     }
+
+#if NET8_0_OR_GREATER
+    /// <summary>
+    /// Returns the correct (clamped to 16) number of trailing zeros given a uint bitmask.
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int Vector128_TrailingZeroCount(uint value)
+    {
+        int tzc = System.Numerics.BitOperations.TrailingZeroCount(value);
+        return tzc > System.Runtime.Intrinsics.Vector128<byte>.Count
+            ? System.Runtime.Intrinsics.Vector128<byte>.Count
+            : tzc;
+    }
+#endif
 }

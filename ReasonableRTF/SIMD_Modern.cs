@@ -30,6 +30,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using ReasonableRTF.Helper;
 using ReasonableRTF.Models.DataTypes;
 
 namespace ReasonableRTF;
@@ -709,7 +710,7 @@ public sealed partial class RtfToTextConverter
                     while (true)
                     {
                         int parLength;
-                        byte index = (byte)BitOperations.TrailingZeroCount(mask);
+                        byte index = (byte)UtilHelper.Vector128_TrailingZeroCount(mask);
                         if (index >= Vector128<byte>.Count - parMaxLength)
                         {
                             CopyVector_ParSupport(current, index, shiftLeftCount, plainText, false);
@@ -739,7 +740,7 @@ public sealed partial class RtfToTextConverter
                 }
                 else if (equals != Vector128<byte>.Zero)
                 {
-                    int index = BitOperations.TrailingZeroCount(equals.ExtractMostSignificantBits());
+                    int index = UtilHelper.Vector128_TrailingZeroCount(equals.ExtractMostSignificantBits());
                     if (index == 0) return;
                     CopyVector128(current, plainText, ref currentPos, index);
                     return;
