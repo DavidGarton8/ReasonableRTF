@@ -23,7 +23,6 @@
 			T:System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute;
 			T:System.Diagnostics.CodeAnalysis.MemberNotNullAttribute;
 			T:System.Diagnostics.CodeAnalysis.NotNullWhenAttribute;
-			M:System.Enum.GetValues``1;
 			M:System.UInt16.TryParse(System.ReadOnlySpan{System.Char},System.Globalization.NumberStyles,System.IFormatProvider,System.UInt16@);
 		</MeziantouPolyfill_IncludedPolyfills>
 	</PropertyGroup>
