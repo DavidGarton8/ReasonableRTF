@@ -26,7 +26,7 @@ public sealed partial class RtfToTextConverter
 
         static Vector<byte> GetZeroPaddedVector(Span<byte> bytes, byte[] name)
         {
-            if (Vector<byte>.Count < _maxSupportedSymbolFontNameLength)
+            if (name.Length > Vector<byte>.Count)
             {
                 return Vector<byte>.Zero;
             }

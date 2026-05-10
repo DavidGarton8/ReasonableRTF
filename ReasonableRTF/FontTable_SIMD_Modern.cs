@@ -34,7 +34,7 @@ public sealed partial class RtfToTextConverter
 
         static Vector512<byte> GetZeroPaddedVector512(Span<byte> bytes, byte[] name)
         {
-            if (Vector512<byte>.Count < _maxSupportedSymbolFontNameLength)
+            if (name.Length > Vector512<byte>.Count)
             {
                 return Vector512<byte>.Zero;
             }
@@ -47,7 +47,7 @@ public sealed partial class RtfToTextConverter
 
         static Vector256<byte> GetZeroPaddedVector256(Span<byte> bytes, byte[] name)
         {
-            if (Vector256<byte>.Count < _maxSupportedSymbolFontNameLength)
+            if (name.Length > Vector256<byte>.Count)
             {
                 return Vector256<byte>.Zero;
             }
@@ -60,7 +60,7 @@ public sealed partial class RtfToTextConverter
 
         static Vector128<byte> GetZeroPaddedVector128(Span<byte> bytes, byte[] name)
         {
-            if (Vector128<byte>.Count < _maxSupportedSymbolFontNameLength)
+            if (name.Length > Vector128<byte>.Count)
             {
                 return Vector128<byte>.Zero;
             }
@@ -78,7 +78,7 @@ public sealed partial class RtfToTextConverter
         char ch,
         ref int currentPos)
     {
-        if (Vector512.IsHardwareAccelerated)
+        if (Vector512.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (Vector512<byte>.Count + 1))
         {
             currentPos--;
 
@@ -134,7 +134,7 @@ public sealed partial class RtfToTextConverter
                 }
             }
         }
-        else if (Vector256.IsHardwareAccelerated)
+        else if (Vector256.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (Vector256<byte>.Count + 1))
         {
             currentPos--;
 
@@ -190,7 +190,7 @@ public sealed partial class RtfToTextConverter
                 }
             }
         }
-        else if (Vector128.IsHardwareAccelerated)
+        else if (Vector128.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (Vector128<byte>.Count + 1))
         {
             currentPos--;
 

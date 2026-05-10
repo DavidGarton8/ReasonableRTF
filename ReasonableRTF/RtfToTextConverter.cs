@@ -2548,9 +2548,9 @@ public sealed partial class RtfToTextConverter
     private bool ShouldUseSimdFontNameCodePath()
     {
 #if NET8_0_OR_GREATER
-        return (System.Runtime.Intrinsics.Vector512.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (System.Runtime.Intrinsics.Vector512<byte>.Count + 1)) ||
-               (System.Runtime.Intrinsics.Vector256.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (System.Runtime.Intrinsics.Vector256<byte>.Count + 1)) ||
-               (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (System.Runtime.Intrinsics.Vector128<byte>.Count + 1));
+        return System.Runtime.Intrinsics.Vector512.IsHardwareAccelerated ||
+               System.Runtime.Intrinsics.Vector256.IsHardwareAccelerated ||
+               System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated;
 #else
         return System.Numerics.Vector.IsHardwareAccelerated && _vectorLengthFitsInAByte && _currentPos < _currentBufferChunkLength - (System.Numerics.Vector<byte>.Count + 1);
 #endif
