@@ -69,7 +69,7 @@ public sealed partial class RtfToTextConverter
         }
         else
         {
-            return new Vector<byte>(0);
+            return Vector<byte>.Zero;
         }
     }
     private static readonly Vector<byte> _indexVec = InitIndexVec();
@@ -85,7 +85,7 @@ public sealed partial class RtfToTextConverter
         int startIndex,
         int spanLength)
     {
-        if (!Vector.IsHardwareAccelerated)
+        if (!Vector.IsHardwareAccelerated || !_vectorLengthFitsInAByte)
         {
             return -1;
         }
@@ -105,194 +105,97 @@ public sealed partial class RtfToTextConverter
             ref byte oneVectorAwayFromEnd = ref Unsafe.Add(ref searchSpace, spanLength - Vector<byte>.Count);
 
             // Loop until either we've finished all elements or there's less than a vector's-worth remaining.
-            if (_vectorLengthFitsInAByte)
+            do
             {
-                do
+                current = Unsafe.ReadUnaligned<Vector<byte>>(ref currentSearchSpace);
+                equalsBraces = Vector.Equals(_openBraceVector, current) | Vector.Equals(_closingBraceVector, current);
+                equalsBackslash = Vector.Equals(_backslashVector, current);
+                equals = equalsBraces | equalsBackslash;
+                if (equals == Vector<byte>.Zero)
                 {
-                    current = Unsafe.ReadUnaligned<Vector<byte>>(ref currentSearchSpace);
-                    equalsBraces = Vector.Equals(_openBraceVector, current) | Vector.Equals(_closingBraceVector, current);
-                    equalsBackslash = Vector.Equals(_backslashVector, current);
-                    equals = equalsBraces | equalsBackslash;
-                    if (equals == Vector<byte>.Zero)
-                    {
-                        currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
-                        continue;
-                    }
+                    currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
+                    continue;
+                }
 
-                    if (equalsBackslash != Vector<byte>.Zero)
-                    {
-                        int backslashIndex = -1;
-                        int bracesIndex = 0;
+                if (equalsBackslash != Vector<byte>.Zero)
+                {
+                    int backslashIndex = -1;
+                    int bracesIndex = 0;
 
-                        bool bracesFound = equalsBraces != Vector<byte>.Zero;
-                        if (!bracesFound || (backslashIndex = LocateFirstFoundByte(equalsBackslash)) < (bracesIndex = LocateFirstFoundByte(equalsBraces)))
+                    bool bracesFound = equalsBraces != Vector<byte>.Zero;
+                    if (!bracesFound || (backslashIndex = LocateFirstFoundByte(equalsBackslash)) < (bracesIndex = LocateFirstFoundByte(equalsBraces)))
+                    {
+                        if (ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, Vector<byte>.Count + (_binLength - 1)) <= spanLength)
                         {
-                            if (ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, Vector<byte>.Count + (_binLength - 1)) <= spanLength)
+                            Vector<byte> lastBlock = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.Add(ref currentSearchSpace, _binLength - 1));
+                            Vector<byte> lastEquals = Vector.Equals(_nVector, lastBlock);
+
+                            Vector<byte> containsBin = Vector.BitwiseAnd(equalsBackslash, lastEquals);
+
+                            if (containsBin == Vector<byte>.Zero)
                             {
-                                Vector<byte> lastBlock = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.Add(ref currentSearchSpace, _binLength - 1));
-                                Vector<byte> lastEquals = Vector.Equals(_nVector, lastBlock);
-
-                                Vector<byte> containsBin = Vector.BitwiseAnd(equalsBackslash, lastEquals);
-
-                                if (containsBin == Vector<byte>.Zero)
+                                if (!bracesFound)
                                 {
-                                    if (!bracesFound)
-                                    {
-                                        currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, bracesIndex);
-                                    }
+                                    currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
+                                    continue;
                                 }
                                 else
                                 {
-                                    Vector<byte> mask = Vector.BitwiseAnd(equalsBackslash, lastEquals);
-                                    while (mask != Vector<byte>.Zero)
-                                    {
-                                        int vectorIndex = LocateFirstFoundByte(mask);
-                                        int index = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, vectorIndex);
-                                        if (index >= spanLength - sizeof(uint) ||
-                                            Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, index)) == binUInt)
-                                        {
-                                            if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
-                                            return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
-                                        }
-
-                                        mask = ClearMaskElementAtIndex(mask, vectorIndex);
-                                    }
+                                    return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, bracesIndex);
                                 }
                             }
                             else
                             {
-                                if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
-                                int currentVectorIndex = backslashIndex;
-                                Vector<byte> mask = ClearMaskElementAtIndex(equalsBackslash, currentVectorIndex);
-                                while (currentVectorIndex < Vector<byte>.Count)
+                                Vector<byte> mask = Vector.BitwiseAnd(equalsBackslash, lastEquals);
+                                while (mask != Vector<byte>.Zero)
                                 {
-                                    int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
-                                    if (spanIndex >= spanLength - sizeof(uint) ||
-                                        Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
+                                    int vectorIndex = LocateFirstFoundByte(mask);
+                                    int index = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, vectorIndex);
+                                    if (index >= spanLength - sizeof(uint) ||
+                                        Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, index)) == binUInt)
                                     {
+                                        if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
                                         return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
                                     }
 
-                                    mask = ClearMaskElementAtIndex(mask, currentVectorIndex);
-                                    currentVectorIndex = LocateFirstFoundByte(mask);
+                                    mask = ClearMaskElementAtIndex(mask, vectorIndex);
                                 }
                             }
-
-                            if (!bracesFound)
-                            {
-                                currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
-                                continue;
-                            }
-                            else
-                            {
-                                return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, bracesIndex);
-                            }
                         }
-                    }
-
-                    return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, equals);
-                }
-                while (!Unsafe.IsAddressGreaterThan(ref currentSearchSpace, ref oneVectorAwayFromEnd));
-            }
-            else
-            {
-                do
-                {
-                    current = Unsafe.ReadUnaligned<Vector<byte>>(ref currentSearchSpace);
-                    equalsBraces = Vector.Equals(_openBraceVector, current) | Vector.Equals(_closingBraceVector, current);
-                    equalsBackslash = Vector.Equals(_backslashVector, current);
-                    equals = equalsBraces | equalsBackslash;
-                    if (equals == Vector<byte>.Zero)
-                    {
-                        currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
-                        continue;
-                    }
-
-                    if (equalsBackslash != Vector<byte>.Zero)
-                    {
-                        int backslashIndex = -1;
-                        int bracesIndex = 0;
-
-                        bool bracesFound = equalsBraces != Vector<byte>.Zero;
-                        if (!bracesFound || (backslashIndex = LocateFirstFoundByte(equalsBackslash)) < (bracesIndex = LocateFirstFoundByte(equalsBraces)))
+                        else
                         {
-                            Vector<byte> vector64;
-                            if (ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, Vector<byte>.Count + (_binLength - 1)) <= spanLength)
+                            if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
+                            int currentVectorIndex = backslashIndex;
+                            Vector<byte> mask = ClearMaskElementAtIndex(equalsBackslash, currentVectorIndex);
+                            while (currentVectorIndex < Vector<byte>.Count)
                             {
-                                Vector<byte> lastBlock = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.Add(ref currentSearchSpace, _binLength - 1));
-                                Vector<byte> lastEquals = Vector.Equals(_nVector, lastBlock);
-
-                                Vector<byte> containsBin = Vector.BitwiseAnd(equalsBackslash, lastEquals);
-
-                                if (containsBin == Vector<byte>.Zero)
+                                int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
+                                if (spanIndex >= spanLength - sizeof(uint) ||
+                                    Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
                                 {
-                                    if (!bracesFound)
-                                    {
-                                        currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, bracesIndex);
-                                    }
+                                    return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
                                 }
-                                else
-                                {
-                                    vector64 = containsBin;
-                                    int currentVectorIndex = LocateFirstFoundByte(containsBin);
-                                    while (currentVectorIndex > -1)
-                                    {
-                                        int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
-                                        if (spanIndex >= spanLength - sizeof(uint) ||
-                                            Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
-                                        {
-                                            if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
-                                            return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
-                                        }
-                                        ++currentVectorIndex;
-                                        currentVectorIndex = LocateFirstFoundByte_Slow_MinusOneOnFail(vector64, currentVectorIndex);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                vector64 = equalsBackslash;
-                                if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
-                                int currentVectorIndex = backslashIndex;
-                                while (currentVectorIndex > -1)
-                                {
-                                    int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
-                                    if (spanIndex >= spanLength - sizeof(uint) ||
-                                        Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
-                                    {
-                                        return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
-                                    }
-                                    ++currentVectorIndex;
-                                    currentVectorIndex = LocateFirstFoundByte_Slow_MinusOneOnFail(vector64, currentVectorIndex);
-                                }
-                            }
 
-                            if (!bracesFound)
-                            {
-                                currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
-                                continue;
-                            }
-                            else
-                            {
-                                return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, bracesIndex);
+                                mask = ClearMaskElementAtIndex(mask, currentVectorIndex);
+                                currentVectorIndex = LocateFirstFoundByte(mask);
                             }
                         }
-                    }
 
-                    return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, equals);
+                        if (!bracesFound)
+                        {
+                            currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
+                            continue;
+                        }
+                        else
+                        {
+                            return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, bracesIndex);
+                        }
+                    }
                 }
-                while (!Unsafe.IsAddressGreaterThan(ref currentSearchSpace, ref oneVectorAwayFromEnd));
+
+                return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, equals);
             }
+            while (!Unsafe.IsAddressGreaterThan(ref currentSearchSpace, ref oneVectorAwayFromEnd));
 
             // If any elements remain, process the last vector in the search space.
             if ((uint)spanLength % Vector<byte>.Count != 0)
