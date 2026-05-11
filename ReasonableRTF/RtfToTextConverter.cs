@@ -2664,12 +2664,17 @@ public sealed partial class RtfToTextConverter
         {
             if (System.Numerics.Vector.IsHardwareAccelerated)
             {
-                SIMD_CopyPlainText(
+                bool finishedOnNonPlainTextChar = SIMD_CopyPlainText(
                     _buffer,
                     _currentPos,
                     _currentBufferChunkLength - _currentPos,
                     _plainText,
                     ref _currentPos);
+
+                if (finishedOnNonPlainTextChar)
+                {
+                    return;
+                }
             }
 
             if (_currentPos < (_currentBufferChunkLength - 1) - _plainTextRunFastPathAmountBackFromBufferEnd &&
@@ -2690,23 +2695,20 @@ public sealed partial class RtfToTextConverter
                 }
             }
 
-            while (!_reachedEndOfStream)
+            // Break out of the scalar loop at the buffer boundary, so that if the plaintext run continues after
+            // the next buffer load, we'll be able to jump back into a SIMD parse.
+            while (_currentPos < _currentBufferChunkLength)
             {
-                while (_currentPos < _currentBufferChunkLength)
+                char ch = (char)_buffer[IncrementCurrentPos()];
+                if (!_isNonPlainText[(byte)ch])
                 {
-                    char ch = (char)_buffer[IncrementCurrentPos()];
-                    if (!_isNonPlainText[(byte)ch])
-                    {
-                        _plainText.Add(ch);
-                    }
-                    else
-                    {
-                        _currentPos--;
-                        return;
-                    }
+                    _plainText.Add(ch);
                 }
-
-                if (_bufferedStream != null) { HandleOutOfBounds(); } else { break; }
+                else
+                {
+                    _currentPos--;
+                    return;
+                }
             }
         }
     }

@@ -324,7 +324,7 @@ public sealed partial class RtfToTextConverter
     the current position for the next vector load to just after the \par either, because that's still slower for
     some reason. Too many overlapping loads just like the keyword thing, I guess.
     */
-    private static void SIMD_CopyPlainText(
+    private static bool SIMD_CopyPlainText(
         byte[] buffer,
         int startIndex,
         int spanLength,
@@ -333,7 +333,7 @@ public sealed partial class RtfToTextConverter
     {
         if (!Vector.IsHardwareAccelerated)
         {
-            return;
+            return false;
         }
 
         ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
@@ -358,34 +358,45 @@ public sealed partial class RtfToTextConverter
                     Vector.Equals(_openBraceVector, current) |
                     Vector.Equals(_closingBraceVector, current);
 
-                int index = LocateFirstFoundByte_VectorCountOnFail(equals);
-
-                if (index == 0)
+                if (equals == Vector<byte>.Zero)
                 {
-                    return;
+                    CopyVector(current, Vector<byte>.Count, plainText, ref currentPos);
                 }
-
-                Vector.Widen(current, out Vector<ushort> lower, out Vector<ushort> upper);
-
-                plainText.EnsureCapacity(plainText.Count + Vector<byte>.Count);
-                lower.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count);
-                upper.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count + (Vector<byte>.Count / 2));
-
-                plainText.Count += index;
-                currentPos += index;
-
-                if (index < Vector<byte>.Count)
+                else
                 {
-                    return;
+                    int index = LocateFirstFoundByte_VectorCountOnFail(equals);
+
+                    if (index == 0)
+                    {
+                        return true;
+                    }
+
+                    CopyVector(current, index, plainText, ref currentPos);
+
+                    if (index < Vector<byte>.Count)
+                    {
+                        return true;
+                    }
                 }
 
                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
             } while (!Unsafe.IsAddressGreaterThan(ref currentSearchSpace, ref oneVectorAwayFromEnd));
         }
 
-        // I think Vector128 should be supported on literally anything these days, but if it's not, just fall out
-        // without doing anything and we'll take the non-SIMD path. We don't fall back to Vector64 because that's
-        // slower than just doing the 8 bytes scalar.
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void CopyVector(Vector<byte> current, int index, ListFast<char> plainText, ref int currentPos)
+    {
+        Vector.Widen(current, out Vector<ushort> lower, out Vector<ushort> upper);
+
+        plainText.EnsureCapacity(plainText.Count + Vector<byte>.Count);
+        lower.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count);
+        upper.CopyTo(Unsafe.As<char[], ushort[]>(ref plainText.ItemsArray), plainText.Count + (Vector<byte>.Count / 2));
+
+        plainText.Count += index;
+        currentPos += index;
     }
 
     #endregion
