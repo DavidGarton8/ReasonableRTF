@@ -119,10 +119,6 @@ public sealed partial class RtfToTextConverter
                         continue;
                     }
 
-                    /*
-                    NOTE: The reason we're not doing the \par-supporting copy like the modern .NET version is
-                    because it needs the Shuffle instruction and that's not available on Framework.
-                    */
                     if (equalsBackslash != Vector<byte>.Zero)
                     {
                         int backslashIndex = -1;
@@ -322,6 +318,10 @@ public sealed partial class RtfToTextConverter
     }
 
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
+    /*
+    NOTE: The reason we're not doing the \par-supporting copy like the modern .NET version is
+    because it needs the Shuffle instruction and that's not available on Framework.
+    */
     private static void SIMD_CopyPlainText(
         byte[] buffer,
         int startIndex,

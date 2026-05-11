@@ -535,7 +535,13 @@ public sealed partial class RtfToTextConverter
                     {
                         int parLength;
                         byte index = (byte)BitOperations.TrailingZeroCount(mask);
-                        if (index >= Vector512<byte>.Count - parMaxLength)
+                        if (index == Vector512<byte>.Count)
+                        {
+                            CopyVector_ParSupport(current, index, shiftLeftCount, plainText, false);
+                            currentPos += index;
+                            break;
+                        }
+                        else if (index >= Vector512<byte>.Count - parMaxLength)
                         {
                             CopyVector_ParSupport(current, index, shiftLeftCount, plainText, false);
                             currentPos += index;
@@ -621,7 +627,13 @@ public sealed partial class RtfToTextConverter
                     {
                         int parLength;
                         byte index = (byte)BitOperations.TrailingZeroCount(mask);
-                        if (index >= Vector256<byte>.Count - parMaxLength)
+                        if (index == Vector256<byte>.Count)
+                        {
+                            CopyVector_ParSupport(current, index, shiftLeftCount, plainText, false);
+                            currentPos += index;
+                            break;
+                        }
+                        else if (index >= Vector256<byte>.Count - parMaxLength)
                         {
                             CopyVector_ParSupport(current, index, shiftLeftCount, plainText, false);
                             currentPos += index;
@@ -707,7 +719,13 @@ public sealed partial class RtfToTextConverter
                     {
                         int parLength;
                         byte index = (byte)UtilHelper.Vector128_TrailingZeroCount(mask);
-                        if (index >= Vector128<byte>.Count - parMaxLength)
+                        if (index == Vector256<byte>.Count)
+                        {
+                            CopyVector_ParSupport(current, index, shiftLeftCount, plainText, false);
+                            currentPos += index;
+                            break;
+                        }
+                        else if (index >= Vector128<byte>.Count - parMaxLength)
                         {
                             CopyVector_ParSupport(current, index, shiftLeftCount, plainText, false);
                             currentPos += index;
