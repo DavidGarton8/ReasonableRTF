@@ -13,9 +13,7 @@ public sealed partial class RtfToTextConverter
 
     private void InitSymbolFontNameVectors()
     {
-        int count = Math.Max(Math.Min(Vector<byte>.Count, 256), _maxSupportedSymbolFontNameLength);
-
-        Span<byte> bytes = stackalloc byte[count];
+        Span<byte> bytes = stackalloc byte[Vector<byte>.Count];
 
         for (int i = _symbolArraysStartingIndex; i < _symbolArraysLength; i++)
         {
