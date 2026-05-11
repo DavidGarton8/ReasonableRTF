@@ -2695,19 +2695,43 @@ public sealed partial class RtfToTextConverter
                 }
             }
 
-            // Break out of the scalar loop at the buffer boundary, so that if the plaintext run continues after
-            // the next buffer load, we'll be able to jump back into a SIMD parse.
-            while (_currentPos < _currentBufferChunkLength)
+            if (System.Numerics.Vector.IsHardwareAccelerated)
             {
-                char ch = (char)_buffer[IncrementCurrentPos()];
-                if (!_isNonPlainText[(byte)ch])
+                // Break out of the scalar loop at the buffer boundary, so that if the plaintext run continues after
+                // the next buffer load, we'll be able to jump back into a SIMD parse.
+                while (_currentPos < _currentBufferChunkLength)
                 {
-                    _plainText.Add(ch);
+                    char ch = (char)_buffer[IncrementCurrentPos()];
+                    if (!_isNonPlainText[(byte)ch])
+                    {
+                        _plainText.Add(ch);
+                    }
+                    else
+                    {
+                        _currentPos--;
+                        return;
+                    }
                 }
-                else
+            }
+            else
+            {
+                while (!_reachedEndOfStream)
                 {
-                    _currentPos--;
-                    return;
+                    while (_currentPos < _currentBufferChunkLength)
+                    {
+                        char ch = (char)_buffer[IncrementCurrentPos()];
+                        if (!_isNonPlainText[(byte)ch])
+                        {
+                            _plainText.Add(ch);
+                        }
+                        else
+                        {
+                            _currentPos--;
+                            return;
+                        }
+                    }
+
+                    if (_bufferedStream != null) { HandleOutOfBounds(); } else { break; }
                 }
             }
         }
