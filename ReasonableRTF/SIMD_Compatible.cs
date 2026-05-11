@@ -91,7 +91,6 @@ public sealed partial class RtfToTextConverter
         }
 
         uint binUInt = BitConverter.IsLittleEndian ? 0x6E69625Cu : 0x5C62696Eu;
-        int currentSpanPosition = 0;
 
         ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
 
@@ -116,7 +115,6 @@ public sealed partial class RtfToTextConverter
                     equals = equalsBraces | equalsBackslash;
                     if (equals == Vector<byte>.Zero)
                     {
-                        currentSpanPosition += Vector<byte>.Count;
                         currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
                         continue;
                     }
@@ -133,7 +131,7 @@ public sealed partial class RtfToTextConverter
                         bool bracesFound = equalsBraces != Vector<byte>.Zero;
                         if (!bracesFound || (backslashIndex = LocateFirstFoundByte(equalsBackslash)) < (bracesIndex = LocateFirstFoundByte(equalsBraces)))
                         {
-                            if (currentSpanPosition + Vector<byte>.Count + (_binLength - 1) <= spanLength)
+                            if (ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, Vector<byte>.Count + (_binLength - 1)) <= spanLength)
                             {
                                 Vector<byte> lastBlock = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.Add(ref currentSearchSpace, _binLength - 1));
                                 Vector<byte> lastEquals = Vector.Equals(_nVector, lastBlock);
@@ -144,7 +142,6 @@ public sealed partial class RtfToTextConverter
                                 {
                                     if (!bracesFound)
                                     {
-                                        currentSpanPosition += Vector<byte>.Count;
                                         currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
                                         continue;
                                     }
@@ -159,8 +156,8 @@ public sealed partial class RtfToTextConverter
                                     while (mask != Vector<byte>.Zero)
                                     {
                                         int vectorIndex = LocateFirstFoundByte(mask);
-                                        int index = currentSpanPosition + vectorIndex;
-                                        if (index < 0 || index >= spanLength - sizeof(uint) ||
+                                        int index = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, vectorIndex);
+                                        if (index >= spanLength - sizeof(uint) ||
                                             Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, index)) == binUInt)
                                         {
                                             if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
@@ -178,7 +175,7 @@ public sealed partial class RtfToTextConverter
                                 Vector<byte> mask = ClearMaskElementAtIndex(equalsBackslash, currentVectorIndex);
                                 while (currentVectorIndex < Vector<byte>.Count)
                                 {
-                                    int spanIndex = currentSpanPosition + currentVectorIndex;
+                                    int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
                                     if (spanIndex >= spanLength - sizeof(uint) ||
                                         Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
                                     {
@@ -192,7 +189,6 @@ public sealed partial class RtfToTextConverter
 
                             if (!bracesFound)
                             {
-                                currentSpanPosition += Vector<byte>.Count;
                                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
                                 continue;
                             }
@@ -217,7 +213,6 @@ public sealed partial class RtfToTextConverter
                     equals = equalsBraces | equalsBackslash;
                     if (equals == Vector<byte>.Zero)
                     {
-                        currentSpanPosition += Vector<byte>.Count;
                         currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
                         continue;
                     }
@@ -231,7 +226,7 @@ public sealed partial class RtfToTextConverter
                         if (!bracesFound || (backslashIndex = LocateFirstFoundByte(equalsBackslash)) < (bracesIndex = LocateFirstFoundByte(equalsBraces)))
                         {
                             Vector<byte> vector64;
-                            if (currentSpanPosition + Vector<byte>.Count + (_binLength - 1) <= spanLength)
+                            if (ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, Vector<byte>.Count + (_binLength - 1)) <= spanLength)
                             {
                                 Vector<byte> lastBlock = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.Add(ref currentSearchSpace, _binLength - 1));
                                 Vector<byte> lastEquals = Vector.Equals(_nVector, lastBlock);
@@ -242,7 +237,6 @@ public sealed partial class RtfToTextConverter
                                 {
                                     if (!bracesFound)
                                     {
-                                        currentSpanPosition += Vector<byte>.Count;
                                         currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
                                         continue;
                                     }
@@ -257,7 +251,7 @@ public sealed partial class RtfToTextConverter
                                     int currentVectorIndex = LocateFirstFoundByte(containsBin);
                                     while (currentVectorIndex > -1)
                                     {
-                                        int spanIndex = currentSpanPosition + currentVectorIndex;
+                                        int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
                                         if (spanIndex >= spanLength - sizeof(uint) ||
                                             Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
                                         {
@@ -276,7 +270,7 @@ public sealed partial class RtfToTextConverter
                                 int currentVectorIndex = backslashIndex;
                                 while (currentVectorIndex > -1)
                                 {
-                                    int spanIndex = currentSpanPosition + currentVectorIndex;
+                                    int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
                                     if (spanIndex >= spanLength - sizeof(uint) ||
                                         Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
                                     {
@@ -289,7 +283,6 @@ public sealed partial class RtfToTextConverter
 
                             if (!bracesFound)
                             {
-                                currentSpanPosition += Vector<byte>.Count;
                                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
                                 continue;
                             }
