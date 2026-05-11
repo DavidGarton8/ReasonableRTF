@@ -778,7 +778,7 @@ public sealed partial class RtfToTextConverter
                                     Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref currentSearchSpace, index)) == parUInt &&
                                     (parLength = _isParEndingChar[Unsafe.Add(ref currentSearchSpace, index + 4)]) > 0)
                                 {
-                                    currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, index+parLength);
+                                    currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, index + parLength);
                                     currentPos += parLength;
                                     AddLineBreak();
                                     goto outerLoop;
