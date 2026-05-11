@@ -319,8 +319,10 @@ public sealed partial class RtfToTextConverter
 
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     /*
-    NOTE: The reason we're not doing the \par-supporting copy like the modern .NET version is
-    because it needs the Shuffle instruction and that's not available on Framework.
+    NOTE: The reason we're not doing the \par-supporting copy like the modern .NET version is because it needs
+    the Shuffle instruction and that's not available on Framework. Also, we're not doing the thing where we set
+    the current position for the next vector load to just after the \par either, because that's still slower for
+    some reason. Too many overlapping loads just like the keyword thing, I guess.
     */
     private static void SIMD_CopyPlainText(
         byte[] buffer,
