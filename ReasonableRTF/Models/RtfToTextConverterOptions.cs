@@ -31,6 +31,11 @@ namespace ReasonableRTF.Models;
 /// </summary>
 public sealed class RtfToTextConverterOptions
 {
+    internal bool _swapUppercaseAndLowercasePhiSymbols = true;
+    internal SymbolFontA0Char _symbolFontA0Char = SymbolFontA0Char.EuroSign;
+    internal LineBreakStyle _lineBreakStyle = LineBreakStyle.EnvironmentDefault;
+    internal bool _convertHiddenText;
+
     /// <summary>
     /// Gets or sets whether to swap the uppercase and lowercase Greek phi characters in the Symbol font to Unicode
     /// translation table.
@@ -40,7 +45,11 @@ public sealed class RtfToTextConverterOptions
     /// <para/>
     /// The default value is <see langword="true"/>.
     /// </summary>
-    public bool SwapUppercaseAndLowercasePhiSymbols { get; set; } = true;
+    public bool SwapUppercaseAndLowercasePhiSymbols
+    {
+        get => _swapUppercaseAndLowercasePhiSymbols;
+        set => _swapUppercaseAndLowercasePhiSymbols = value;
+    }
 
     /// <summary>
     /// Gets or sets the character at index 0xA0 (160) in the Symbol font to Unicode translation table.
@@ -49,14 +58,22 @@ public sealed class RtfToTextConverterOptions
     /// <para/>
     /// The default value is <see cref="SymbolFontA0Char.EuroSign"/>.
     /// </summary>
-    public SymbolFontA0Char SymbolFontA0Char { get; set; } = SymbolFontA0Char.EuroSign;
+    public SymbolFontA0Char SymbolFontA0Char
+    {
+        get => _symbolFontA0Char;
+        set => _symbolFontA0Char = value;
+    }
 
     /// <summary>
     /// Gets or sets the line break style for the converted plain text.
     /// <para/>
     /// The default value is <see cref="LineBreakStyle.EnvironmentDefault"/>.
     /// </summary>
-    public LineBreakStyle LineBreakStyle { get; set; } = LineBreakStyle.EnvironmentDefault;
+    public LineBreakStyle LineBreakStyle
+    {
+        get => _lineBreakStyle;
+        set => _lineBreakStyle = value;
+    }
 
     /// <summary>
     /// Gets or sets whether to convert text that is marked as hidden. If <see langword="true"/>, this text will
@@ -64,13 +81,9 @@ public sealed class RtfToTextConverterOptions
     /// <para/>
     /// The default value is <see langword="false"/>.
     /// </summary>
-    public bool ConvertHiddenText { get; set; }
-
-    internal void CopyTo(RtfToTextConverterOptions dest)
+    public bool ConvertHiddenText
     {
-        dest.SwapUppercaseAndLowercasePhiSymbols = SwapUppercaseAndLowercasePhiSymbols;
-        dest.SymbolFontA0Char = SymbolFontA0Char;
-        dest.LineBreakStyle = LineBreakStyle;
-        dest.ConvertHiddenText = ConvertHiddenText;
+        get => _convertHiddenText;
+        set => _convertHiddenText = value;
     }
 }

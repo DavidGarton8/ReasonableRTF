@@ -22,13 +22,15 @@ public sealed partial class RtfToTextConverter
     */
     private RtfError ParseKeyword_Fast_Vector128()
     {
+        byte[] buffer = _buffer;
+
         bool hasParam = false;
         int param = 0;
         Symbol? symbol;
 
         int startingCurrentPos = _currentPos;
 
-        char ch = (char)_buffer[IncrementCurrentPos()];
+        char ch = (char)buffer[IncrementCurrentPos()];
 
         if (!CharExtension.IsAsciiLetter(ch))
         {
@@ -50,7 +52,7 @@ public sealed partial class RtfToTextConverter
         }
         else
         {
-            Vector128<byte> keyword = Vector128.Create(_buffer, _currentPos - 1);
+            Vector128<byte> keyword = Vector128.Create(buffer, _currentPos - 1);
             Vector128<byte> asciiLetters = Vector128.GreaterThan((keyword | _hex20_128) - _all_a_128, _z_minus_a_128);
 
             uint notEqualsElements = asciiLetters.ExtractMostSignificantBits();
@@ -68,13 +70,13 @@ public sealed partial class RtfToTextConverter
             keyword = Vector128.BitwiseAnd(keyword, maskVec);
 
             _currentPos += keywordCount;
-            ch = (char)_buffer[_currentPos - 1];
+            ch = (char)buffer[_currentPos - 1];
 
             int negateParam = 0;
             if (ch == '-')
             {
                 negateParam = 1;
-                ch = (char)_buffer[IncrementCurrentPos()];
+                ch = (char)buffer[IncrementCurrentPos()];
             }
             if (CharExtension.IsAsciiDigit(ch))
             {
@@ -86,7 +88,7 @@ public sealed partial class RtfToTextConverter
                         int i;
                         for (i = 0;
                              i < _paramMaxLen + 1 && CharExtension.IsAsciiDigit(ch);
-                             i++, ch = (char)_buffer[IncrementCurrentPos()])
+                             i++, ch = (char)buffer[IncrementCurrentPos()])
                         {
                             param = (param * 10) + (ch - '0');
                         }
