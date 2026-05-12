@@ -177,7 +177,7 @@ public sealed partial class RtfToTextConverter
                                 }
 
                                 mask = ClearMaskElementAtIndex(mask, currentVectorIndex);
-                                currentVectorIndex = LocateFirstFoundByte(mask);
+                                currentVectorIndex = LocateFirstFoundByte_VectorCountOnFail(mask);
                             }
                         }
 
@@ -261,27 +261,18 @@ public sealed partial class RtfToTextConverter
                     Vector.Equals(_openBraceVector, current) |
                     Vector.Equals(_closingBraceVector, current);
 
-                if (equals == Vector<byte>.Zero)
+                if (equals != Vector<byte>.Zero)
                 {
-                    CopyVector(current, Vector<byte>.Count, plainText, ref currentPos);
-                }
-                else
-                {
-                    int index = LocateFirstFoundByte_VectorCountOnFail(equals);
-
-                    if (index == 0)
+                    int index = LocateFirstFoundByte(equals);
+                    if (index > 0)
                     {
-                        return true;
+                        CopyVector(current, index, plainText, ref currentPos);
                     }
 
-                    CopyVector(current, index, plainText, ref currentPos);
-
-                    if (index < Vector<byte>.Count)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
 
+                CopyVector(current, Vector<byte>.Count, plainText, ref currentPos);
                 currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
             } while (!Unsafe.IsAddressGreaterThan(ref currentSearchSpace, ref oneVectorAwayFromEnd));
         }
@@ -357,21 +348,6 @@ public sealed partial class RtfToTextConverter
         }
 
         return Vector<byte>.Count;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int LocateFirstFoundByte_Slow_MinusOneOnFail(Vector<byte> vector, int start)
-    {
-        int i = start;
-        for (; i < Vector<byte>.Count; i++)
-        {
-            if (vector[i] != 0)
-            {
-                return i;
-            }
-        }
-
-        return -1;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
