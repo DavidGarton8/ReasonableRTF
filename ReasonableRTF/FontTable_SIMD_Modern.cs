@@ -229,6 +229,7 @@ public sealed partial class RtfToTextConverter
                 }
                 else
                 {
+                    currentPos += Vector128<byte>.Count;
                     if (Vector128<byte>.Count < _maxSupportedSymbolFontNameLength)
                     {
                         vector.CopyTo(_symbolFontNameBuffer);
