@@ -38,6 +38,7 @@ public sealed partial class RtfToTextConverter
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private SymbolFont SIMD_TryGetFontName(
+        ref byte bufferRef,
         byte[] buffer,
         char ch,
         ref int currentPos)
@@ -87,7 +88,7 @@ public sealed partial class RtfToTextConverter
                 if (Vector<byte>.Count < _maxSupportedSymbolFontNameLength)
                 {
                     vector.CopyTo(_symbolFontNameBuffer);
-                    return GetSymbolFont_Scalar(ch, Vector<byte>.Count);
+                    return GetSymbolFont_Scalar(ref bufferRef, ch, Vector<byte>.Count);
                 }
                 else
                 {

@@ -9,7 +9,7 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
-    private RtfError ParseKeyword_FontTable_Fast_Vector128(out KeywordType fontTableKeyword, out int param)
+    private RtfError ParseKeyword_FontTable_Fast_Vector128(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
         byte[] buffer = _buffer;
 
@@ -20,7 +20,7 @@ public sealed partial class RtfToTextConverter
 
         int startingCurrentPos = _currentPos;
 
-        char ch = (char)buffer[IncrementCurrentPos()];
+        char ch = (char)GetAndIncrementCurrentPos(ref bufferRef);
 
         if (!CharExtension.IsAsciiLetter(ch))
         {
@@ -66,7 +66,7 @@ public sealed partial class RtfToTextConverter
             if (ch == '-')
             {
                 negateParam = 1;
-                ch = (char)buffer[IncrementCurrentPos()];
+                ch = (char)GetAndIncrementCurrentPos(ref bufferRef);
             }
             if (CharExtension.IsAsciiDigit(ch))
             {
@@ -78,7 +78,7 @@ public sealed partial class RtfToTextConverter
                         int i;
                         for (i = 0;
                              i < _paramMaxLen + 1 && CharExtension.IsAsciiDigit(ch);
-                             i++, ch = (char)buffer[IncrementCurrentPos()])
+                             i++, ch = (char)GetAndIncrementCurrentPos(ref bufferRef))
                         {
                             param = (param * 10) + (ch - '0');
                         }
@@ -127,7 +127,7 @@ public sealed partial class RtfToTextConverter
 
         fontTableKeyword = symbol.KeywordType;
         return fontTableKeyword < KeywordType.F
-            ? DispatchKeyword(symbol, param, hasParam, null, 0)
+            ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0)
             : RtfError.OK;
     }
 }

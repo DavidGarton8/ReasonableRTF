@@ -8,7 +8,7 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
-    private RtfError ParseKeyword_FontTable_Slow(out KeywordType fontTableKeyword, out int param)
+    private RtfError ParseKeyword_FontTable_Slow(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
         bool hasParam = false;
         param = 0;
@@ -50,7 +50,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(symbol, param, hasParam, null, 0);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0);
         }
         else
         {
@@ -101,7 +101,7 @@ public sealed partial class RtfToTextConverter
             }
 
             _currentPos += MinusOneIfNotSpace_8Bits(ch);
-        // [FenGen:ScalarKeywordParseSection:Slow:Dest:End]
+            // [FenGen:ScalarKeywordParseSection:Slow:Dest:End]
 
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
@@ -131,7 +131,7 @@ public sealed partial class RtfToTextConverter
 
             fontTableKeyword = symbol.KeywordType;
             return fontTableKeyword < KeywordType.F
-                ? DispatchKeyword(symbol, param, hasParam, keyword, keywordCount)
+                ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, keyword, keywordCount)
                 : RtfError.OK;
         }
     }

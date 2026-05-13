@@ -10,8 +10,9 @@ internal static class GenAttributes
     {
         internal FenGen_ParseKeywordAttribute(
             string getByteFunctionName,
-            string bufferName,
-            string incrementFunctionName)
+            string bufferRefIncrementFunctionName,
+            string incrementFunctionName,
+            string bufferRefName)
         { }
     }
 }
