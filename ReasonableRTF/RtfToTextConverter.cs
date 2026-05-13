@@ -2323,10 +2323,8 @@ public sealed partial class RtfToTextConverter
     {
         while (!_reachedEndOfStream)
         {
-            // @BufferRefSafe: Guard for 1
             while (_currentPos < _currentBufferChunkLength)
             {
-                // @BufferRefSafe: Use 1 of 1
                 char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 // Ordered by most frequently appearing first
@@ -2353,9 +2351,7 @@ public sealed partial class RtfToTextConverter
                             GroupStack_CurrentPropertyHidden == 0)
                         {
                             // No measurable perf loss from this, and it lets us avoid duplicating the loop body.
-                            // @BufferRefSafe: Guard for 1
                             char currentChar = (char)(_currentPos < _currentBufferChunkLength
-                                // @BufferRefSafe: Use 1 of 1
                                 ? GetByteAtPos(ref bufferRef, _currentPos)
                                 : GetByte(_currentPos));
 
@@ -2448,10 +2444,8 @@ public sealed partial class RtfToTextConverter
 
         while (!_reachedEndOfStream)
         {
-            // @BufferRefSafe: Guard for 1
             while (_currentPos < _currentBufferChunkLength)
             {
-                // @BufferRefSafe: Use 1 of 1
                 char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 switch (ch)
@@ -2572,15 +2566,12 @@ public sealed partial class RtfToTextConverter
     {
         int symbolFontNameCount;
         bool isNonSemicolonSeparatorChar = false;
-        // @BufferRefSafe: Guard for loop max
         if (_currentPos < _currentBufferChunkLength - (_maxSymbolFontNameLength + 1))
         {
             for (symbolFontNameCount = symbolFontNameCountStart;
-                 // @BufferRefSafe: Loop guard
                  symbolFontNameCount < _maxSymbolFontNameLength &&
                  ch != ';' &&
                  !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]);
-                 // @BufferRefSafe: Loop use
                  symbolFontNameCount++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
             {
                 _symbolFontNameBuffer[symbolFontNameCount] = (byte)ch;
@@ -2657,10 +2648,8 @@ public sealed partial class RtfToTextConverter
             uint[] table = _symbolFontTables[(int)symbolFont];
             while (!_reachedEndOfStream)
             {
-                // @BufferRefSafe: Guard for 1
                 while (_currentPos < _currentBufferChunkLength)
                 {
-                    // @BufferRefSafe: Use 1 of 1
                     char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     if (!_isNonPlainText[(byte)ch])
                     {
@@ -2694,14 +2683,11 @@ public sealed partial class RtfToTextConverter
                 }
             }
 
-            // @BufferRefSafe: Guard for loop max
             if (_currentPos < (_currentBufferChunkLength - 1) - _plainTextRunFastPathAmountBackFromBufferEnd &&
                 _plainText.Count < (_plainText.Capacity - _plainTextRunFastPathAmountBackFromBufferEnd) - 1)
             {
-                // @BufferRefSafe: Loop guard
                 for (int i = 0; i < _plainTextRunFastPathAmountBackFromBufferEnd; i++)
                 {
-                    // @BufferRefSafe: Loop use
                     char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     if (!_isNonPlainText[(byte)ch])
                     {
@@ -2719,10 +2705,8 @@ public sealed partial class RtfToTextConverter
             {
                 // Break out of the scalar loop at the buffer boundary, so that if the plaintext run continues
                 // after the next buffer load, we'll be able to jump back into a SIMD parse.
-                // @BufferRefSafe: Guard for 1
                 while (_currentPos < _currentBufferChunkLength)
                 {
-                    // @BufferRefSafe: Use 1 of 1
                     char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     if (!_isNonPlainText[(byte)ch])
                     {
@@ -2739,10 +2723,8 @@ public sealed partial class RtfToTextConverter
             {
                 while (!_reachedEndOfStream)
                 {
-                    // @BufferRefSafe: Guard for 1
                     while (_currentPos < _currentBufferChunkLength)
                     {
-                        // @BufferRefSafe: Use 1 of 1
                         char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         if (!_isNonPlainText[(byte)ch])
                         {
@@ -3029,12 +3011,9 @@ public sealed partial class RtfToTextConverter
         byte byte1;
         byte byte2;
 
-        // @BufferRefSafe: Guard for 2
         if (_currentPos < _currentBufferChunkLength - 1)
         {
-            // @BufferRefSafe: Use 1 of 2
             byte1 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
-            // @BufferRefSafe: Use 2 of 2
             byte2 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
         }
         else
@@ -3046,20 +3025,15 @@ public sealed partial class RtfToTextConverter
         AddByteToHexBuffer(byte1, byte2);
 
         // TODO: Manually duplicated code for performance - should be automated if possible
-        // @BufferRefSafe: Guard for 4
         while (_currentPos < _currentBufferChunkLength - 3)
         {
-            // @BufferRefSafe: Use 1 of 4
             byte b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
             if (b == (byte)'\\')
             {
-                // @BufferRefSafe: Use 2 of 4
                 b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                 if (b == (byte)'\'')
                 {
-                    // @BufferRefSafe: Use 3 of 4
                     byte1 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
-                    // @BufferRefSafe: Use 4 of 4
                     byte2 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     AddByteToHexBuffer(byte1, byte2);
                 }
@@ -3134,26 +3108,21 @@ public sealed partial class RtfToTextConverter
     private RtfError HandleUnicodeRun(ref byte bufferRef)
     {
         // TODO: Manually duplicated code for performance - should be automated if possible
-        // @BufferRefSafe: Guard for 4 + param length
         while (_currentPos < (_currentBufferChunkLength - (3 + _paramMaxLen + 1 + 1)))
         {
-            // @BufferRefSafe: Use 1 of 4
             char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
             if (ch == '\\')
             {
-                // @BufferRefSafe: Use 2 of 4
                 ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 if (ch == 'u')
                 {
-                    // @BufferRefSafe: Use 3 of 4
                     ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                     int negateParam = 0;
                     if (ch == '-')
                     {
                         negateParam = 1;
-                        // @BufferRefSafe: Use 4 of 4
                         ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     }
                     if (CharExtension.IsAsciiDigit(ch))
@@ -3166,9 +3135,7 @@ public sealed partial class RtfToTextConverter
                             {
                                 int i;
                                 for (i = 0;
-                                     // @BufferRefSafe: Loop guard
                                      i < _paramMaxLen + 1 && CharExtension.IsAsciiDigit(ch);
-                                     // @BufferRefSafe: Loop use
                                      i++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
                                 {
                                     param = (param * 10) + (ch - '0');
@@ -3342,25 +3309,20 @@ public sealed partial class RtfToTextConverter
         int numToSkip = GroupStack_CurrentPropertyUnicodeCharSkipCount;
 
         // TODO: Manually duplicated code for performance - should be automated if possible
-        // @BufferRefSafe: Guard for 6
         while (numToSkip > 0 && _currentPos < _currentBufferChunkLength - 5)
         {
-            // @BufferRefSafe: Use 1 of 6
             char c = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
             switch (c)
             {
                 case '\\':
-                    // @BufferRefSafe: Use 2 of 6
                     if (GetByteAtCurrentPosAndIncrement(ref bufferRef) == '\'')
                     {
-                        // @BufferRefSafe: Use 3 of 6
                         byte b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         if (!CharExtension.IsAsciiHexDigit((char)b))
                         {
                             _currentPos--;
                             break;
                         }
-                        // @BufferRefSafe: Use 4 of 6
                         b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         if (!CharExtension.IsAsciiHexDigit((char)b))
                         {
@@ -3369,10 +3331,8 @@ public sealed partial class RtfToTextConverter
                         }
                         numToSkip--;
                     }
-                    // @BufferRefSafe: Use 5 of 6
                     else if (_isSeparatorChar[GetByteAtCurrentPosAndIncrement(ref bufferRef)])
                     {
-                        // @BufferRefSafe: Use 6 of 6
                         _ = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         numToSkip--;
                     }
@@ -4446,10 +4406,8 @@ public sealed partial class RtfToTextConverter
 
         while (!_reachedEndOfStream)
         {
-            // @BufferRefSafe: Guard for 1
             while (_currentPos < _currentBufferChunkLength)
             {
-                // @BufferRefSafe: Use 1 of 1
                 char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 switch (ch)
@@ -4529,16 +4487,13 @@ public sealed partial class RtfToTextConverter
                 back in the stream, which we can't do. So if we don't find the end of our subgroup stack in the
                 current buffer chunk, just give up and take the slow path that properly parses escapes.
                 */
-                // @BufferRefSafe: Guard both sides
                 if (index <= 0 ||
                     index >= _currentBufferChunkLength ||
-                    // @BufferRefSafe: Use index within guarded block
                     GetByteAtPos(ref bufferRef, index - 1) == '\\')
                 {
                     _groupStackCount = startGroupLevel;
                     return;
                 }
-                // @BufferRefSafe: Use index within guarded block
                 switch (GetByteAtPos(ref bufferRef, index))
                 {
                     case (byte)'{':
@@ -4555,13 +4510,9 @@ public sealed partial class RtfToTextConverter
                     // If we find \bin, run away: it could contain unescaped curly braces that are just part of
                     // the raw binary.
                     case (byte)'\\':
-                        // @BufferRefSafe: Guard for bin length (4)
                         if (index > _currentBufferChunkLength - _binLength ||
-                            // @BufferRefSafe: Use 1 of 3
                             (GetByteAtPos(ref bufferRef, index + 1) == 'b' &&
-                             // @BufferRefSafe: Use 2 of 3
                              GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
-                             // @BufferRefSafe: Use 3 of 3
                              GetByteAtPos(ref bufferRef, index + 3) == 'n'))
                         {
                             _groupStackCount = startGroupLevel;
@@ -4600,13 +4551,11 @@ public sealed partial class RtfToTextConverter
 
             for (; index < _currentBufferChunkLength - _binLength; index++)
             {
-                // @BufferRefSafe
                 char ch = (char)GetByteAtPos(ref bufferRef, index);
                 switch (ch)
                 {
                     case '\\':
                         byte nextChar;
-                        // @BufferRefSafe
                         if (index > _currentBufferChunkLength - _binLength ||
                             ((nextChar = GetByteAtPos(ref bufferRef, index + 1)) == 'b' &&
                              GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
@@ -4670,8 +4619,6 @@ public sealed partial class RtfToTextConverter
 
     private bool FoundSkipDataKeyword(ref byte bufferRef, int index)
     {
-        // @BufferRefSafe as long as it's only called in the one place with this guard:
-        // else if (index < _currentBufferChunkLength - sizeof(uint) && FoundSkipDataKeyword(ref bufferRef, index + 1))
         SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos(ref bufferRef, index)];
         if (keyword != null)
         {

@@ -74,7 +74,6 @@ public sealed partial class RtfToTextConverter
         char ch,
         ref int currentPos)
     {
-        // @BufferRefSafe: Guard for Vector512<byte> length + 1
         if (Vector512.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (Vector512<byte>.Count + 1))
         {
             currentPos--;
@@ -108,7 +107,6 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                // @BufferRefSafe: Use within guarded range
                 ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector512<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
@@ -136,7 +134,6 @@ public sealed partial class RtfToTextConverter
                 }
             }
         }
-        // @BufferRefSafe: Guard for Vector256<byte> length + 1
         else if (Vector256.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (Vector256<byte>.Count + 1))
         {
             currentPos--;
@@ -170,7 +167,6 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                // @BufferRefSafe: Use within guarded range
                 ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector256<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
@@ -198,7 +194,6 @@ public sealed partial class RtfToTextConverter
                 }
             }
         }
-        // @BufferRefSafe: Guard for Vector128<byte> length + 1
         else if (Vector128.IsHardwareAccelerated && _currentPos < _currentBufferChunkLength - (Vector128<byte>.Count + 1))
         {
             currentPos--;
@@ -232,7 +227,6 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                // @BufferRefSafe: Use within guarded range
                 ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector128<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {

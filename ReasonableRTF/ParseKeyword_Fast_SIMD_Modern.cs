@@ -21,7 +21,6 @@ public sealed partial class RtfToTextConverter
     If we were smarter about it and parsed all found complete keywords in each vector, would Vector256 be faster
     again?
     */
-    // @BufferRefSafe for everything in here as long as we're only called within the ParseKeyword() guard block
     private RtfError ParseKeyword_Fast_Vector128(ref byte bufferRef)
     {
         bool hasParam = false;

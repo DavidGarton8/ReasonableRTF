@@ -9,7 +9,6 @@ namespace ReasonableRTF;
 public sealed partial class RtfToTextConverter
 {
     // Generated version that doesn't do manual bounds checking, for when we know we're far enough from the end of the buffer
-    // @BufferRefSafe for everything in here as long as we're only called within the ParseKeyword() guard block
     private RtfError ParseKeyword_Fast(ref byte bufferRef)
     {
         bool hasParam = false;

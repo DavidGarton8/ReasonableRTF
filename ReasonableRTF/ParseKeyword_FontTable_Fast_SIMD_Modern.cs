@@ -1,6 +1,5 @@
 ﻿#if NET8_0_OR_GREATER
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
@@ -10,7 +9,6 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
-    // @BufferRefSafe for everything in here as long as we're only called within the ParseKeyword_FontTable() guard block
     private RtfError ParseKeyword_FontTable_Fast_Vector128(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
         bool hasParam = false;

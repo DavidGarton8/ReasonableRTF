@@ -42,7 +42,6 @@ public sealed partial class RtfToTextConverter
         char ch,
         ref int currentPos)
     {
-        // @BufferRefSafe: Guard for Vector<byte> length + 1
         if (_currentPos < _currentBufferChunkLength - (Vector<byte>.Count + 1))
         {
             currentPos--;
@@ -76,7 +75,6 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                // @BufferRefSafe: Use within guarded range
                 ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
