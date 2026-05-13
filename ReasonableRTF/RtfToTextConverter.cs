@@ -2343,6 +2343,7 @@ public sealed partial class RtfToTextConverter
                         {
                             // No measurable perf loss from this, and it lets us avoid duplicating the loop body.
                             char currentChar = (char)(_currentPos < _currentBufferChunkLength
+                                // @BufferRefSafe
                                 ? GetByteAtPos(ref bufferRef, _currentPos)
                                 : GetByte(_currentPos));
 
@@ -4492,11 +4493,15 @@ public sealed partial class RtfToTextConverter
                 back in the stream, which we can't do. So if we don't find the end of our subgroup stack in the
                 current buffer chunk, just give up and take the slow path that properly parses escapes.
                 */
-                if (index == -1 || GetByteAtPos(ref bufferRef, index - 1) == '\\')
+                if (index == -1 ||
+                    index >= _currentBufferChunkLength ||
+                    // @BufferRefSafe
+                    GetByteAtPos(ref bufferRef, index - 1) == '\\')
                 {
                     _groupStackCount = startGroupLevel;
                     return;
                 }
+                // @BufferRefSafe
                 switch (GetByteAtPos(ref bufferRef, index))
                 {
                     case (byte)'{':
@@ -4513,6 +4518,7 @@ public sealed partial class RtfToTextConverter
                     // If we find \bin, run away: it could contain unescaped curly braces that are just part of
                     // the raw binary.
                     case (byte)'\\':
+                        // @BufferRefSafe
                         if (index > _currentBufferChunkLength - _binLength ||
                             (GetByteAtPos(ref bufferRef, index + 1) == 'b' &&
                              GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
@@ -4554,11 +4560,13 @@ public sealed partial class RtfToTextConverter
 
             for (; index < _currentBufferChunkLength - _binLength; index++)
             {
+                // @BufferRefSafe
                 char ch = (char)GetByteAtPos(ref bufferRef, index);
                 switch (ch)
                 {
                     case '\\':
                         byte nextChar;
+                        // @BufferRefSafe
                         if (index > _currentBufferChunkLength - _binLength ||
                             ((nextChar = GetByteAtPos(ref bufferRef, index + 1)) == 'b' &&
                              GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
@@ -4567,7 +4575,7 @@ public sealed partial class RtfToTextConverter
                             _groupStackCount = startGroupLevel;
                             return;
                         }
-                        else if (index < _currentBufferChunkLength - 4 && FoundSkipDataKeyword(ref bufferRef, index + 1))
+                        else if (index < _currentBufferChunkLength - sizeof(uint) && FoundSkipDataKeyword(ref bufferRef, index + 1))
                         {
                             _groupStackCount = startGroupLevel;
                             return;
@@ -4622,6 +4630,8 @@ public sealed partial class RtfToTextConverter
 
     private static bool FoundSkipDataKeyword(ref byte bufferRef, int index)
     {
+        // @BufferRefSafe as long as it's only called in the one place with this guard:
+        // else if (index < _currentBufferChunkLength - sizeof(uint) && FoundSkipDataKeyword(ref bufferRef, index + 1))
         SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos(ref bufferRef, index)];
         if (keyword != null)
         {
