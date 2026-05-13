@@ -158,7 +158,7 @@ public sealed partial class RtfToTextConverter
 
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     // Made to handle the \binN situation while losing as little performance as possible.
-    private static int SIMD_SkipDest(
+    private int SIMD_SkipDest(
         ref byte bufferRef,
         int startIndex,
         int spanLength)
@@ -174,7 +174,7 @@ public sealed partial class RtfToTextConverter
 
         if (Vector512.IsHardwareAccelerated && spanLength >= Vector512<byte>.Count)
         {
-            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
+            ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
             Vector512<byte> equalsBraces;
             Vector512<byte> equalsBackslash;
             Vector512<byte> equals;
@@ -272,7 +272,7 @@ public sealed partial class RtfToTextConverter
         }
         else if (Vector256.IsHardwareAccelerated && spanLength >= Vector256<byte>.Count)
         {
-            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
+            ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
             Vector256<byte> equalsBraces;
             Vector256<byte> equalsBackslash;
             Vector256<byte> equals;
@@ -370,7 +370,7 @@ public sealed partial class RtfToTextConverter
         }
         else if (Vector128.IsHardwareAccelerated && spanLength >= Vector128<byte>.Count)
         {
-            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
+            ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
             Vector128<byte> equalsBraces;
             Vector128<byte> equalsBackslash;
             Vector128<byte> equals;
@@ -485,7 +485,7 @@ public sealed partial class RtfToTextConverter
         uint parUInt = BitConverter.IsLittleEndian ? 0x7261705Cu : 0x5C706172u;
         const int parMaxLength = 5;
 
-        ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
+        ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
 
         if (Vector512.IsHardwareAccelerated && spanLength >= Vector512<byte>.Count)
         {

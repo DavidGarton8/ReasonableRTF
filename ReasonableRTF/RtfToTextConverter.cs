@@ -2344,8 +2344,9 @@ public sealed partial class RtfToTextConverter
                             GroupStack_CurrentPropertyHidden == 0)
                         {
                             // No measurable perf loss from this, and it lets us avoid duplicating the loop body.
+                            // @BufferRefSafe: Guard for 1
                             char currentChar = (char)(_currentPos < _currentBufferChunkLength
-                                // @BufferRefSafe
+                                // @BufferRefSafe: Use 1 of 1
                                 ? GetByteAtPos(ref bufferRef, _currentPos)
                                 : GetByte(_currentPos));
 
@@ -4533,15 +4534,16 @@ public sealed partial class RtfToTextConverter
                 back in the stream, which we can't do. So if we don't find the end of our subgroup stack in the
                 current buffer chunk, just give up and take the slow path that properly parses escapes.
                 */
-                if (index == -1 ||
+                // @BufferRefSafe: Guard both sides
+                if (index <= 0 ||
                     index >= _currentBufferChunkLength ||
-                    // @BufferRefSafe
+                    // @BufferRefSafe: Use index within guarded block
                     GetByteAtPos(ref bufferRef, index - 1) == '\\')
                 {
                     _groupStackCount = startGroupLevel;
                     return;
                 }
-                // @BufferRefSafe
+                // @BufferRefSafe: Use index within guarded block
                 switch (GetByteAtPos(ref bufferRef, index))
                 {
                     case (byte)'{':
@@ -4558,10 +4560,13 @@ public sealed partial class RtfToTextConverter
                     // If we find \bin, run away: it could contain unescaped curly braces that are just part of
                     // the raw binary.
                     case (byte)'\\':
-                        // @BufferRefSafe
+                        // @BufferRefSafe: Guard for bin length (4)
                         if (index > _currentBufferChunkLength - _binLength ||
+                            // @BufferRefSafe: Use 1 of 3
                             (GetByteAtPos(ref bufferRef, index + 1) == 'b' &&
+                             // @BufferRefSafe: Use 2 of 3
                              GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
+                             // @BufferRefSafe: Use 3 of 3
                              GetByteAtPos(ref bufferRef, index + 3) == 'n'))
                         {
                             _groupStackCount = startGroupLevel;
@@ -4675,7 +4680,7 @@ public sealed partial class RtfToTextConverter
         SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos(ref bufferRef, index)];
         if (keyword != null)
         {
-            uint value = Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)index));
+            uint value = Unsafe.ReadUnaligned<uint>(ref GetRefAtPos(ref bufferRef, index));
             if (((value & keyword.Id) != 0) ||
                 (keyword.UseExtra &&
                  (((value & keyword.Id2) != 0) || ((value & keyword.Id3) != 0))))
@@ -4703,6 +4708,13 @@ public sealed partial class RtfToTextConverter
     {
         Debug.Assert(pos < _currentBufferChunkLength);
         return Unsafe.ReadUnaligned<byte>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)pos));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ref byte GetRefAtPos(ref byte bufferRef, int pos)
+    {
+        Debug.Assert(pos < _currentBufferChunkLength);
+        return ref Unsafe.AddByteOffset(ref bufferRef, (nint)pos);
     }
 
     /// <summary>

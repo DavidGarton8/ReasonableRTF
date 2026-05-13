@@ -80,7 +80,7 @@ public sealed partial class RtfToTextConverter
 
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     // Made to handle the \binN situation while losing as little performance as possible.
-    private static int SIMD_SkipDest(
+    private int SIMD_SkipDest(
         ref byte bufferRef,
         int startIndex,
         int spanLength)
@@ -94,7 +94,7 @@ public sealed partial class RtfToTextConverter
 
         if (spanLength >= Vector<byte>.Count)
         {
-            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, (nint)startIndex);
+            ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
             Vector<byte> equalsBraces;
             Vector<byte> equalsBackslash;
             Vector<byte> equals;
@@ -225,7 +225,7 @@ public sealed partial class RtfToTextConverter
     the current position for the next vector load to just after the \par either, because that's still slower for
     some reason. Too many overlapping loads just like the keyword thing, I guess.
     */
-    private static bool SIMD_CopyPlainText(
+    private bool SIMD_CopyPlainText(
         ref byte bufferRef,
         int startIndex,
         int spanLength,
@@ -237,7 +237,7 @@ public sealed partial class RtfToTextConverter
             return false;
         }
 
-        ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, (nint)startIndex);
+        ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
 
         if (spanLength >= Vector<byte>.Count)
         {
