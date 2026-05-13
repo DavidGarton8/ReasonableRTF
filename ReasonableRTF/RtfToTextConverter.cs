@@ -2255,6 +2255,10 @@ public sealed partial class RtfToTextConverter
                 return new RtfResult(RtfError.NotAnRtfFile, 0, null);
             }
 
+            /*
+            TODO: On Framework x86, we're slower than before we added the bufferRef stuff. But if we disable the
+            bufferRef stuff for x86, we're even slower still.
+            */
             ReadOnlySpan<byte> bufferSpan = _buffer.AsSpan();
             ref byte bufferRef = ref MemoryMarshal.GetReference(bufferSpan);
 
