@@ -10,6 +10,7 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
+    // @BufferRefSafe for everything in here as long as we're only called within the ParseKeyword_FontTable() guard block
     private RtfError ParseKeyword_FontTable_Fast_Vector128(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
         bool hasParam = false;
