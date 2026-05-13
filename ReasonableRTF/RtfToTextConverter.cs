@@ -92,10 +92,21 @@ public sealed partial class RtfToTextConverter
 
     #region Constants
 
+    private readonly ulong _rtfHeaderMask = BitConverter.IsLittleEndian
+        ? 0x00_00_00_FF_FF_FF_FF_FFul
+        : 0xFF_FF_FF_FF_FF_00_00_00ul;
+    private readonly ulong _rtfHeaderAsULong = BitConverter.IsLittleEndian
+        ? 0x00_00_00_66_74_72_5C_7Bul
+        : 0x7B_5C_72_74_66_00_00_00ul;
+
     internal const ushort NoCodePage = ushort.MaxValue;
 
     // "\bin"
     private const int _binLength = 4;
+    private readonly uint _binUInt = BitConverter.IsLittleEndian ? 0x6E69625Cu : 0x5C62696Eu;
+    // "\par"
+    private const int _parMaxLength = 5;
+    private readonly uint _parUInt = BitConverter.IsLittleEndian ? 0x7261705Cu : 0x5C706172u;
 
     private const int _plainTextDefaultCapacity = 4096;
     private const int _internalBufferDefaultCapacity = 32;
@@ -130,7 +141,13 @@ public sealed partial class RtfToTextConverter
 
     #endregion
 
-    private readonly byte[] SYMBOLName = "SYMBOL "u8.ToArray();
+    private readonly byte[] _SYMBOLName = "SYMBOL "u8.ToArray();
+    private readonly ulong _SYMBOLKeywordAsULong = BitConverter.IsLittleEndian
+        ? 0x00_20_4C_4F_42_4D_59_53ul
+        : 0x53_59_4D_42_4F_4C_20_00ul;
+    private readonly ulong _SYMBOLKeywordAsULong_Mask = BitConverter.IsLittleEndian
+        ? 0x00_FF_FF_FF_FF_FF_FF_FFul
+        : 0xFF_FF_FF_FF_FF_FF_FF_00ul;
 
     private sealed class SkipDataKeywords
     {
@@ -3615,7 +3632,11 @@ public sealed partial class RtfToTextConverter
     */
     private RtfError HandleFieldInstruction(ref byte bufferRef)
     {
-        if (GroupStack_CurrentPropertyHidden != 0) return RewindAndSkipGroup(ref bufferRef);
+        if (GroupStack_CurrentPropertyHidden != 0)
+        {
+            SkipDest(ref bufferRef, null, 0);
+            return RtfError.OK;
+        }
 
         _fldinstSymbolNumber.ClearFast();
         _fldinstSymbolFontName.ClearFast();
@@ -3625,12 +3646,26 @@ public sealed partial class RtfToTextConverter
 
         #region Check for SYMBOL instruction
 
-        for (i = 0; i < SYMBOLName.Length; i++)
+        if (_currentPos < _currentBufferChunkLength - sizeof(ulong))
         {
-            byte b = GetByte(IncrementCurrentPos());
-            if (b != SYMBOLName[i])
+            ulong SYMBOLKeyword = Unsafe.ReadUnaligned<ulong>(ref GetRefAtPos(ref bufferRef, _currentPos));
+
+            if ((SYMBOLKeyword & _SYMBOLKeywordAsULong_Mask) != _SYMBOLKeywordAsULong)
             {
-                return RewindAndSkipGroup(ref bufferRef);
+                SkipDest(ref bufferRef, null, 0);
+                return RtfError.OK;
+            }
+            _currentPos += _SYMBOLName.Length;
+        }
+        else
+        {
+            for (i = 0; i < _SYMBOLName.Length; i++)
+            {
+                byte b = GetByte(IncrementCurrentPos());
+                if (b != _SYMBOLName[i])
+                {
+                    return RewindAndSkipGroup(ref bufferRef);
+                }
             }
         }
 
@@ -4234,16 +4269,10 @@ public sealed partial class RtfToTextConverter
 
     private bool IsValidRtfFile()
     {
-        const int ulongLength = 8;
-
-        // Big-endian gets the infinitesimally slower path. Oh well.
-        if (BitConverter.IsLittleEndian && _currentBufferChunkLength >= _leadingBufferByteCount + ulongLength)
+        if (_currentBufferChunkLength >= _leadingBufferByteCount + sizeof(ulong))
         {
-            const ulong rtfHeaderMask = 0x00_00_00_FF_FF_FF_FF_FF;
-            const ulong rtfHeaderAsULong = 0x00_00_00_66_74_72_5C_7B;
-
             ulong chunk = Unsafe.ReadUnaligned<ulong>(ref _buffer[_leadingBufferByteCount]);
-            if ((chunk & rtfHeaderMask) != rtfHeaderAsULong)
+            if ((chunk & _rtfHeaderMask) != _rtfHeaderAsULong)
             {
                 return false;
             }

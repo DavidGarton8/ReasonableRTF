@@ -90,8 +90,6 @@ public sealed partial class RtfToTextConverter
             return -1;
         }
 
-        uint binUInt = BitConverter.IsLittleEndian ? 0x6E69625Cu : 0x5C62696Eu;
-
         if (spanLength >= Vector<byte>.Count)
         {
             ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
@@ -150,7 +148,7 @@ public sealed partial class RtfToTextConverter
                                     int vectorIndex = LocateFirstFoundByte(mask);
                                     int index = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, vectorIndex);
                                     if (index >= spanLength - sizeof(uint) ||
-                                        Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref searchSpace, (nint)index)) == binUInt)
+                                        Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref searchSpace, (nint)index)) == _binUInt)
                                     {
                                         if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
                                         return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
@@ -169,7 +167,7 @@ public sealed partial class RtfToTextConverter
                             {
                                 int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
                                 if (spanIndex >= spanLength - sizeof(uint) ||
-                                    Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref searchSpace, (nint)spanIndex)) == binUInt)
+                                    Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref searchSpace, (nint)spanIndex)) == _binUInt)
                                 {
                                     return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
                                 }
