@@ -159,6 +159,7 @@ public sealed partial class RtfToTextConverter
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     // Made to handle the \binN situation while losing as little performance as possible.
     private static int SIMD_SkipDest(
+        ref byte bufferRef,
         byte[] buffer,
         int startIndex,
         int spanLength)
@@ -473,6 +474,7 @@ public sealed partial class RtfToTextConverter
 
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     private bool SIMD_CopyPlainText(
+        ref byte bufferRef,
         byte[] buffer,
         int startIndex,
         int spanLength,

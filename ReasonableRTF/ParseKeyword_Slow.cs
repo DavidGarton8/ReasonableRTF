@@ -42,7 +42,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(null, 0);
+                    SkipDest(ref bufferRef, null, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -120,7 +120,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(null, 0);
+                    SkipDest(ref bufferRef, null, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;

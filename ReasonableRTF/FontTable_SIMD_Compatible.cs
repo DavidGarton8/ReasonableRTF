@@ -45,7 +45,7 @@ public sealed partial class RtfToTextConverter
     {
         currentPos--;
 
-        Vector<byte> vector = new Vector<byte>(buffer, currentPos);
+        Vector<byte> vector = Unsafe.ReadUnaligned<Vector<byte>>(ref GetRefAtCurrentPos(ref bufferRef));
         Vector<byte> equalsTerminatingChar =
             Vector.Equals(_zeroVector, vector) |
             Vector.Equals(_lfVector, vector) |
@@ -72,7 +72,7 @@ public sealed partial class RtfToTextConverter
         }
         else
         {
-            ch = (char)buffer[currentPos + Vector<byte>.Count];
+            ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector<byte>.Count);
             if (ch == ';' || _isNonPlainText[(byte)ch])
             {
                 if (EarlyOut(Vector<byte>.Count, ref currentPos, ch))

@@ -50,7 +50,7 @@ public sealed partial class RtfToTextConverter
         }
         else
         {
-            Vector128<byte> keyword = Vector128.Create(GetRefAtPos(ref bufferRef, _currentPos - 1));
+            Vector128<byte> keyword = Vector128.Create(_buffer, _currentPos - 1);
             Vector128<byte> asciiLetters = Vector128.GreaterThan((keyword | _hex20_128) - _all_a_128, _z_minus_a_128);
 
             uint notEqualsElements = asciiLetters.ExtractMostSignificantBits();
@@ -68,7 +68,7 @@ public sealed partial class RtfToTextConverter
             keyword = Vector128.BitwiseAnd(keyword, maskVec);
 
             _currentPos += keywordCount;
-            ch = (char)GetByteAtPos(ref bufferRef, _currentPos - 1);
+            ch = (char)_buffer[_currentPos - 1];
 
             int negateParam = 0;
             if (ch == '-')
@@ -124,7 +124,7 @@ public sealed partial class RtfToTextConverter
         {
             if (_skipDestinationIfUnknown)
             {
-                SkipDest(null, 0);
+                SkipDest(ref bufferRef, null, 0);
             }
             _skipDestinationIfUnknown = false;
             return RtfError.OK;

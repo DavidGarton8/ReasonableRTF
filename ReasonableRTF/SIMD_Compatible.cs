@@ -81,6 +81,7 @@ public sealed partial class RtfToTextConverter
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     // Made to handle the \binN situation while losing as little performance as possible.
     private static int SIMD_SkipDest(
+        ref byte bufferRef,
         byte[] buffer,
         int startIndex,
         int spanLength)
@@ -92,11 +93,9 @@ public sealed partial class RtfToTextConverter
 
         uint binUInt = BitConverter.IsLittleEndian ? 0x6E69625Cu : 0x5C62696Eu;
 
-        ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
-
         if (spanLength >= Vector<byte>.Count)
         {
-            ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+            ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
             Vector<byte> equalsBraces;
             Vector<byte> equalsBackslash;
             Vector<byte> equals;
@@ -228,6 +227,7 @@ public sealed partial class RtfToTextConverter
     some reason. Too many overlapping loads just like the keyword thing, I guess.
     */
     private static bool SIMD_CopyPlainText(
+        ref byte bufferRef,
         byte[] buffer,
         int startIndex,
         int spanLength,
@@ -239,9 +239,7 @@ public sealed partial class RtfToTextConverter
             return false;
         }
 
-        ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
-
-        ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+        ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
 
         if (spanLength >= Vector<byte>.Count)
         {
