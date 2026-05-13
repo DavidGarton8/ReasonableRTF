@@ -71,6 +71,15 @@ public sealed partial class RtfToTextConverter
 {
     #region Private fields
 
+    // Add one extra to all the known counts because I can't think whether the read increments will put us one
+    // over or not
+    private const int _keywordParseMaxRequiredBytes =
+        1 +
+        1 + 1 +
+        _keywordMaxLen + 1 + 1 +
+        1 + 1 +
+        _paramMaxLen + 1 + 1;
+
     // Officially, the header is supposed to be "{\rtf1", but some files have just "{\rtf" or "{\rtf0" or other
     // crap. RichTextBox also only checks for "{\rtf", no doubt for that very reason.
     private static readonly byte[] _rtfHeaderBytes = @"{\rtf"u8.ToArray();
@@ -2381,14 +2390,7 @@ public sealed partial class RtfToTextConverter
 
     private RtfError ParseKeyword(ref byte bufferRef)
     {
-        // Add one extra to all the known counts because I can't think whether the read increments will put us
-        // one over or not
-        if (_currentPos < (_currentBufferChunkLength - 1) - (
-                1 + 1 +
-                _keywordMaxLen + 1 + 1 +
-                1 + 1 +
-                _paramMaxLen + 1 + 1
-            ))
+        if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
         {
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
@@ -2410,14 +2412,7 @@ public sealed partial class RtfToTextConverter
 
     private RtfError ParseKeyword_FontTable(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
-        // Add one extra to all the known counts because I can't think whether the read increments will put us
-        // one over or not
-        if (_currentPos < (_currentBufferChunkLength - 1) - (
-                1 + 1 +
-                _keywordMaxLen + 1 + 1 +
-                1 + 1 +
-                _paramMaxLen + 1 + 1
-            ))
+        if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
         {
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
