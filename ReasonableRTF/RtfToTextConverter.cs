@@ -2343,7 +2343,7 @@ public sealed partial class RtfToTextConverter
                         {
                             // No measurable perf loss from this, and it lets us avoid duplicating the loop body.
                             char currentChar = (char)(_currentPos < _currentBufferChunkLength
-                                ? GetByteAtCurrentPos(ref bufferRef)
+                                ? GetByteAtPos(ref bufferRef, _currentPos)
                                 : GetByte(_currentPos));
 
                             if (_isNonPlainText[currentChar])
@@ -2677,7 +2677,6 @@ public sealed partial class RtfToTextConverter
             {
                 bool finishedOnNonPlainTextChar = SIMD_CopyPlainText(
                     ref bufferRef,
-                    _buffer,
                     _currentPos,
                     _currentBufferChunkLength - _currentPos,
                     _plainText,
@@ -4484,7 +4483,7 @@ public sealed partial class RtfToTextConverter
         {
             while (!_reachedEndOfStream)
             {
-                index = SIMD_SkipDest(ref bufferRef, _buffer, index, _currentBufferChunkLength - index);
+                index = SIMD_SkipDest(ref bufferRef, index, _currentBufferChunkLength - index);
 
                 /*
                 Curly braces can be escaped like \{ and \}. But there can be an arbitrary amount of backslashes
@@ -4548,7 +4547,7 @@ public sealed partial class RtfToTextConverter
             minimize perf loss when we don't.
             */
 
-            if (keyword != null && keywordLength >= 4 && FoundSkipDataKeyword(keyword, ref bufferRef, 0))
+            if (keyword != null && keywordLength >= 4 && FoundSkipDataKeyword(keyword, 0))
             {
                 return;
             }
@@ -4568,7 +4567,7 @@ public sealed partial class RtfToTextConverter
                             _groupStackCount = startGroupLevel;
                             return;
                         }
-                        else if (index < _currentBufferChunkLength - 4 && FoundSkipDataKeyword(_buffer, ref bufferRef, index + 1))
+                        else if (index < _currentBufferChunkLength - 4 && FoundSkipDataKeyword(ref bufferRef, index + 1))
                         {
                             _groupStackCount = startGroupLevel;
                             return;
@@ -4596,13 +4595,16 @@ public sealed partial class RtfToTextConverter
         }
     }
 
-    private static bool FoundSkipDataKeyword(byte[] buffer, ref byte bufferRef, int index)
+    // After testing a number of different methods of keyword detection, this came out the fastest. There are
+    // only six letters our keywords can start with, so any other letter will be rejected with a single array
+    // access and a null check.
+
+    private static bool FoundSkipDataKeyword(byte[] buffer, int index)
     {
         // After testing a number of different methods of keyword detection, this came out the fastest. There are
         // only six letters our keywords can start with, so any other letter will be rejected with a single array
         // access and a null check.
 
-#if NET8_0_OR_GREATER
         SkipDataKeywords? keyword = _skipDataKeywords[buffer[index]];
         if (keyword != null)
         {
@@ -4614,11 +4616,16 @@ public sealed partial class RtfToTextConverter
                 return true;
             }
         }
-#else
+
+        return false;
+    }
+
+    private static bool FoundSkipDataKeyword(ref byte bufferRef, int index)
+    {
         SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos(ref bufferRef, index)];
         if (keyword != null)
         {
-            uint value = Unsafe.ReadUnaligned<uint>(ref GetRefAtPos(ref bufferRef, index));
+            uint value = Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)index));
             if (((value & keyword.Id) != 0) ||
                 (keyword.UseExtra &&
                  (((value & keyword.Id2) != 0) || ((value & keyword.Id3) != 0))))
@@ -4626,7 +4633,6 @@ public sealed partial class RtfToTextConverter
                 return true;
             }
         }
-#endif
 
         return false;
     }
@@ -4635,58 +4641,17 @@ public sealed partial class RtfToTextConverter
 
     #region Read and seek wrappers
 
-    // Wouldn't you know it, the original direct buffer access path is faster on modern .NET, while the bufferRef
-    // path is faster on .NET Framework. No idea how that could possibly be the case, but oh well...
-
-#if NET8_0_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private byte GetByteAtCurrentPosAndIncrement(ref byte bufferRef)
     {
-        return _buffer[IncrementCurrentPos()];
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte GetByteAtCurrentPos(ref byte bufferRef)
-    {
-        return _buffer[_currentPos];
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte GetByteAtPos(ref byte bufferRef, int pos)
-    {
-        return _buffer[pos];
-    }
-#else
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte GetByteAtCurrentPosAndIncrement(ref byte bufferRef)
-    {
-        return Unsafe.ReadUnaligned<byte>(ref Unsafe.Add(ref bufferRef, IncrementCurrentPos()));
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte GetByteAtCurrentPos(ref byte bufferRef)
-    {
-        return Unsafe.ReadUnaligned<byte>(ref Unsafe.Add(ref bufferRef, _currentPos));
+        return Unsafe.ReadUnaligned<byte>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)IncrementCurrentPos()));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static byte GetByteAtPos(ref byte bufferRef, int pos)
     {
-        return Unsafe.ReadUnaligned<byte>(ref Unsafe.Add(ref bufferRef, pos));
+        return Unsafe.ReadUnaligned<byte>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)pos));
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ref byte GetRefAtCurrentPos(ref byte bufferRef)
-    {
-        return ref Unsafe.Add(ref bufferRef, _currentPos);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ref byte GetRefAtPos(ref byte bufferRef, int pos)
-    {
-        return ref Unsafe.Add(ref bufferRef, pos);
-    }
-#endif
 
     /// <summary>
     /// Increment _currentPos. Behaves like _currentPos++, returning the value before it was modified.

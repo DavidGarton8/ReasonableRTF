@@ -160,7 +160,6 @@ public sealed partial class RtfToTextConverter
     // Made to handle the \binN situation while losing as little performance as possible.
     private static int SIMD_SkipDest(
         ref byte bufferRef,
-        byte[] buffer,
         int startIndex,
         int spanLength)
     {
@@ -173,11 +172,9 @@ public sealed partial class RtfToTextConverter
 
         uint binUInt = BitConverter.IsLittleEndian ? 0x6E69625Cu : 0x5C62696Eu;
 
-        ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
-
         if (Vector512.IsHardwareAccelerated && spanLength >= Vector512<byte>.Count)
         {
-            ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
             Vector512<byte> equalsBraces;
             Vector512<byte> equalsBackslash;
             Vector512<byte> equals;
@@ -275,7 +272,7 @@ public sealed partial class RtfToTextConverter
         }
         else if (Vector256.IsHardwareAccelerated && spanLength >= Vector256<byte>.Count)
         {
-            ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
             Vector256<byte> equalsBraces;
             Vector256<byte> equalsBackslash;
             Vector256<byte> equals;
@@ -373,7 +370,7 @@ public sealed partial class RtfToTextConverter
         }
         else if (Vector128.IsHardwareAccelerated && spanLength >= Vector128<byte>.Count)
         {
-            ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
             Vector128<byte> equalsBraces;
             Vector128<byte> equalsBackslash;
             Vector128<byte> equals;
@@ -475,7 +472,6 @@ public sealed partial class RtfToTextConverter
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     private bool SIMD_CopyPlainText(
         ref byte bufferRef,
-        byte[] buffer,
         int startIndex,
         int spanLength,
         ListFast<char> plainText,
@@ -489,9 +485,7 @@ public sealed partial class RtfToTextConverter
         uint parUInt = BitConverter.IsLittleEndian ? 0x7261705Cu : 0x5C706172u;
         const int parMaxLength = 5;
 
-        ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
-
-        ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+        ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, startIndex);
 
         if (Vector512.IsHardwareAccelerated && spanLength >= Vector512<byte>.Count)
         {

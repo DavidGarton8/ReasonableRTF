@@ -45,7 +45,7 @@ public sealed partial class RtfToTextConverter
     {
         currentPos--;
 
-        Vector<byte> vector = Unsafe.ReadUnaligned<Vector<byte>>(ref GetRefAtCurrentPos(ref bufferRef));
+        Vector<byte> vector = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)_currentPos));
         Vector<byte> equalsTerminatingChar =
             Vector.Equals(_zeroVector, vector) |
             Vector.Equals(_lfVector, vector) |

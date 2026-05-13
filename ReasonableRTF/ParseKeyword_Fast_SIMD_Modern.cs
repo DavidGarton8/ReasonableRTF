@@ -1,6 +1,7 @@
 ﻿#if NET8_0_OR_GREATER
 
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
@@ -50,7 +51,7 @@ public sealed partial class RtfToTextConverter
         }
         else
         {
-            Vector128<byte> keyword = Vector128.Create(_buffer, _currentPos - 1);
+            Vector128<byte> keyword = Vector128.LoadUnsafe(ref Unsafe.AddByteOffset(ref bufferRef, _currentPos - 1));
             Vector128<byte> asciiLetters = Vector128.GreaterThan((keyword | _hex20_128) - _all_a_128, _z_minus_a_128);
 
             uint notEqualsElements = asciiLetters.ExtractMostSignificantBits();

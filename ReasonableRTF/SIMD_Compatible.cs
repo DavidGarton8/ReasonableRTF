@@ -82,7 +82,6 @@ public sealed partial class RtfToTextConverter
     // Made to handle the \binN situation while losing as little performance as possible.
     private static int SIMD_SkipDest(
         ref byte bufferRef,
-        byte[] buffer,
         int startIndex,
         int spanLength)
     {
@@ -95,7 +94,7 @@ public sealed partial class RtfToTextConverter
 
         if (spanLength >= Vector<byte>.Count)
         {
-            ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
+            ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, (nint)startIndex);
             Vector<byte> equalsBraces;
             Vector<byte> equalsBackslash;
             Vector<byte> equals;
@@ -228,7 +227,6 @@ public sealed partial class RtfToTextConverter
     */
     private static bool SIMD_CopyPlainText(
         ref byte bufferRef,
-        byte[] buffer,
         int startIndex,
         int spanLength,
         ListFast<char> plainText,
@@ -239,7 +237,7 @@ public sealed partial class RtfToTextConverter
             return false;
         }
 
-        ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
+        ref byte searchSpace = ref Unsafe.AddByteOffset(ref bufferRef, (nint)startIndex);
 
         if (spanLength >= Vector<byte>.Count)
         {

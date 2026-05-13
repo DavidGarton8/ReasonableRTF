@@ -79,7 +79,7 @@ public sealed partial class RtfToTextConverter
         {
             currentPos--;
 
-            Vector512<byte> vector = Vector512.Create(buffer, currentPos);
+            Vector512<byte> vector = Vector512.LoadUnsafe(ref Unsafe.AddByteOffset(ref bufferRef, currentPos));
             Vector512<byte> equalsTerminatingChar =
                 Vector512.Equals(_zeroVector512, vector) |
                 Vector512.Equals(_lfVector512, vector) |
@@ -135,7 +135,7 @@ public sealed partial class RtfToTextConverter
         {
             currentPos--;
 
-            Vector256<byte> vector = Vector256.Create(buffer, currentPos);
+            Vector256<byte> vector = Vector256.LoadUnsafe(ref Unsafe.AddByteOffset(ref bufferRef, currentPos));
             Vector256<byte> equalsTerminatingChar =
                 Vector256.Equals(_zeroVector256, vector) |
                 Vector256.Equals(_lfVector256, vector) |
@@ -191,7 +191,7 @@ public sealed partial class RtfToTextConverter
         {
             currentPos--;
 
-            Vector128<byte> vector = Vector128.Create(buffer, currentPos);
+            Vector128<byte> vector = Vector128.LoadUnsafe(ref Unsafe.AddByteOffset(ref bufferRef, currentPos));
             Vector128<byte> equalsTerminatingChar =
                 Vector128.Equals(_zeroVector128, vector) |
                 Vector128.Equals(_lfVector128, vector) |
