@@ -2247,7 +2247,6 @@ public sealed partial class RtfToTextConverter
                 _chunksRead = 1;
             }
 
-
             // The user may already have validated, but this check is ultra-fast so we can afford to do it
             // without complicating the logic with a user option and all.
             if (!IsValidRtfFile())
