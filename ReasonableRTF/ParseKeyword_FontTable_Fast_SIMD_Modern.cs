@@ -58,7 +58,7 @@ public sealed partial class RtfToTextConverter
             keyword = Vector128.BitwiseAnd(keyword, maskVec);
 
             _currentPos += keywordCount;
-            ch = (char)_buffer[_currentPos - 1];
+            ch = (char)GetByteAtPos(ref bufferRef, _currentPos - 1);
 
             int negateParam = 0;
             if (ch == '-')
