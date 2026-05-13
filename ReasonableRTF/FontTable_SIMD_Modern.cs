@@ -71,7 +71,6 @@ public sealed partial class RtfToTextConverter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private SymbolFont SIMD_TryGetFontName(
         ref byte bufferRef,
-        byte[] buffer,
         char ch,
         ref int currentPos)
     {
@@ -106,7 +105,7 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                ch = (char)buffer[currentPos + Vector512<byte>.Count];
+                ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector512<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
                     if (EarlyOut(Vector512<byte>.Count, ref currentPos, ch))
@@ -162,7 +161,7 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                ch = (char)buffer[currentPos + Vector256<byte>.Count];
+                ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector256<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
                     if (EarlyOut(Vector256<byte>.Count, ref currentPos, ch))
@@ -218,7 +217,7 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                ch = (char)buffer[currentPos + Vector128<byte>.Count];
+                ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector128<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
                     if (EarlyOut(Vector128<byte>.Count, ref currentPos, ch))
@@ -230,6 +229,7 @@ public sealed partial class RtfToTextConverter
                 }
                 else
                 {
+                    currentPos += Vector128<byte>.Count;
                     if (Vector128<byte>.Count < _maxSupportedSymbolFontNameLength)
                     {
                         vector.CopyTo(_symbolFontNameBuffer);
