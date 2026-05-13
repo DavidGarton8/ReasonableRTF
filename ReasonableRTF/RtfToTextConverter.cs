@@ -2258,6 +2258,10 @@ public sealed partial class RtfToTextConverter
             TODO: On Framework x86, we're slower than before we added the bufferRef stuff. But if we disable the
             bufferRef stuff for x86, we're even slower still.
             */
+
+            // Avoid bounds checks by passing a buffer reference everywhere. Perf skyrockets on Framework 64-bit.
+            // Downside: no bounds checks. Built-in ones, I mean - we still do our own. Possibly not worth it.
+            // But that shameful 96x number.
             ReadOnlySpan<byte> bufferSpan = _buffer.AsSpan();
             ref byte bufferRef = ref MemoryMarshal.GetReference(bufferSpan);
 
