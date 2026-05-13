@@ -8,7 +8,7 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
-    [GenAttributes.FenGen_ParseKeyword(nameof(GetByte), nameof(GetAndIncrementCurrentPos), nameof(IncrementCurrentPos), nameof(bufferRef))]
+    [GenAttributes.FenGen_ParseKeyword(nameof(GetByte), nameof(GetByteAtCurrentPosAndIncrement), nameof(IncrementCurrentPos), nameof(bufferRef))]
     private RtfError ParseKeyword_Slow(ref byte bufferRef)
     {
         bool hasParam = false;

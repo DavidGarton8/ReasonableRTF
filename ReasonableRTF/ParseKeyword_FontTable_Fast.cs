@@ -10,15 +10,13 @@ public sealed partial class RtfToTextConverter
 {
     private RtfError ParseKeyword_FontTable_Fast(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
-        byte[] buffer = _buffer;
-
         bool hasParam = false;
         param = 0;
         Symbol? symbol;
         fontTableKeyword = default;
 
         // [FenGen:ScalarKeywordParseSection:Fast:Dest:Begin]
-        char ch = (char)GetAndIncrementCurrentPos(ref bufferRef);
+        char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
         byte[] keyword = _keyword;
 
@@ -59,7 +57,7 @@ public sealed partial class RtfToTextConverter
             byte keywordCount;
             for (keywordCount = 0;
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
-                 keywordCount++, ch = (char)GetAndIncrementCurrentPos(ref bufferRef))
+                 keywordCount++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
             {
                 keyword[keywordCount] = (byte)ch;
             }
@@ -72,7 +70,7 @@ public sealed partial class RtfToTextConverter
             if (ch == '-')
             {
                 negateParam = 1;
-                ch = (char)GetAndIncrementCurrentPos(ref bufferRef);
+                ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
             }
             if (CharExtension.IsAsciiDigit(ch))
             {
@@ -84,7 +82,7 @@ public sealed partial class RtfToTextConverter
                         int i;
                         for (i = 0;
                              i < _paramMaxLen + 1 && CharExtension.IsAsciiDigit(ch);
-                             i++, ch = (char)GetAndIncrementCurrentPos(ref bufferRef))
+                             i++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
                         {
                             param = (param * 10) + (ch - '0');
                         }
