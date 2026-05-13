@@ -4656,7 +4656,7 @@ public sealed partial class RtfToTextConverter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private byte GetByteAtCurrentPosAndIncrement(ref byte bufferRef)
     {
-        return Unsafe.ReadUnaligned<byte>(ref Unsafe.Add(ref bufferRef, _currentPos++));
+        return Unsafe.ReadUnaligned<byte>(ref Unsafe.Add(ref bufferRef, IncrementCurrentPos()));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

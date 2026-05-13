@@ -114,9 +114,9 @@ RtfResult result = converter.Convert("some_file.rtf", options);
 
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.8246/25H2/2025Update/HudsonValley2)
 AMD Ryzen 5 5600 3.50GHz, 1 CPU, 12 logical and 6 physical cores
-.NET SDK 10.0.203
-  [Host]     : .NET 10.0.7 (10.0.7, 10.0.726.21808), X64 RyuJIT x86-64-v3
-  DefaultJob : .NET 10.0.7 (10.0.7, 10.0.726.21808), X64 RyuJIT x86-64-v3
+.NET SDK 10.0.204
+  [Host]     : .NET 10.0.8 (10.0.8, 10.0.826.23019), X64 RyuJIT x86-64-v3
+  DefaultJob : .NET 10.0.8 (10.0.8, 10.0.826.23019), X64 RyuJIT x86-64-v3
 
 
 ```
@@ -124,10 +124,10 @@ AMD Ryzen 5 5600 3.50GHz, 1 CPU, 12 logical and 6 physical cores
 |---------------------------------- |-------------:|----------:|----------:|-------------:|----------|
 | RichTextBox_FullSet               | 3,331.340 ms | 6.2250 ms | 5.5183 ms |   43.59 MB/s | 1x       |
 | RichTextBox_NoImageSet            | 1,432.217 ms | 3.7089 ms | 3.4693 ms |    2.47 MB/s | 1x       |
-| ReasonableRTF_FullSet             |    19.046 ms | 0.0289 ms | 0.0241 ms | 7624.20 MB/s | 175x     |
-| ReasonableRTF_NoImageSet          |     4.650 ms | 0.0070 ms | 0.0062 ms |  762.08 MB/s | 308x     |
-| ReasonableRTF_FullSet_Streamed    |    20.832 ms | 0.0431 ms | 0.0403 ms | 6970.61 MB/s | 160x     |
-| ReasonableRTF_NoImageSet_Streamed |     4.770 ms | 0.0116 ms | 0.0108 ms |  742.91 MB/s | 300x     |
+| ReasonableRTF_FullSet             |    18.724 ms | 0.0429 ms | 0.0401 ms | 7755.38 MB/s | 178x     |
+| ReasonableRTF_NoImageSet          |     4.470 ms | 0.0101 ms | 0.0095 ms |  792.77 MB/s | 320x     |
+| ReasonableRTF_FullSet_Streamed    |    20.507 ms | 0.0738 ms | 0.0691 ms | 7081.08 MB/s | 163x     |
+| ReasonableRTF_NoImageSet_Streamed |     4.555 ms | 0.0134 ms | 0.0125 ms |  777.97 MB/s | 314x     |
 
 ### .NET Framework 4.8 64-bit
 
@@ -144,10 +144,10 @@ AMD Ryzen 5 5600 3.50GHz, 1 CPU, 12 logical and 6 physical cores
 |---------------------------------- |-------------:|----------:|----------:|-------------:|----------|
 | RichTextBox_FullSet               | 2,779.775 ms | 3.9318 ms | 3.2833 ms |   52.24 MB/s | 1x       |
 | RichTextBox_NoImageSet            |   992.237 ms | 2.5478 ms | 2.2585 ms |    3.57 MB/s | 1x       |
-| ReasonableRTF_FullSet             |    26.486 ms | 0.0623 ms | 0.0583 ms | 5482.59 MB/s | 105x     |
-| ReasonableRTF_NoImageSet          |     7.082 ms | 0.0195 ms | 0.0182 ms |  500.38 MB/s | 140x     |
-| ReasonableRTF_FullSet_Streamed    |    28.901 ms | 0.0662 ms | 0.0619 ms | 5024.45 MB/s | 96x      |
-| ReasonableRTF_NoImageSet_Streamed |     7.160 ms | 0.0145 ms | 0.0136 ms |  494.93 MB/s | 139x     |
+| ReasonableRTF_FullSet             |    24.423 ms | 0.0542 ms | 0.0507 ms | 5945.70 MB/s | 114x     |
+| ReasonableRTF_NoImageSet          |     6.354 ms | 0.0146 ms | 0.0136 ms |  557.71 MB/s | 156x     |
+| ReasonableRTF_FullSet_Streamed    |    27.045 ms | 0.0323 ms | 0.0270 ms | 5369.26 MB/s | 103x     |
+| ReasonableRTF_NoImageSet_Streamed |     6.530 ms | 0.0149 ms | 0.0139 ms |  542.67 MB/s | 152x     |
 
 ### .NET Framework 4.8 32-bit
 
@@ -164,10 +164,10 @@ AMD Ryzen 5 5600 3.50GHz, 1 CPU, 12 logical and 6 physical cores
 |---------------------------------- |-------------:|------------:|------------:|-------------:|----------|
 | RichTextBox_FullSet               | 6,932.056 ms | 131.6848 ms | 140.9013 ms |   20.95 MB/s | 1x       |
 | RichTextBox_NoImageSet            | 2,885.139 ms |  57.0121 ms |  81.7651 ms |    1.23 MB/s | 1x       |
-| ReasonableRTF_FullSet             |    45.338 ms |   0.0832 ms |   0.0778 ms | 3202.87 MB/s | 153x     |
-| ReasonableRTF_NoImageSet          |     9.706 ms |   0.0202 ms |   0.0189 ms |  365.10 MB/s | 297x     |
-| ReasonableRTF_FullSet_Streamed    |    49.980 ms |   0.1606 ms |   0.1502 ms | 2905.40 MB/s | 139x     |
-| ReasonableRTF_NoImageSet_Streamed |     9.770 ms |   0.0260 ms |   0.0230 ms |  362.71 MB/s | 295x     |
+| ReasonableRTF_FullSet             |    45.957 ms |   0.0704 ms |   0.0658 ms | 3159.73 MB/s | 151x     |
+| ReasonableRTF_NoImageSet          |     9.744 ms |   0.0201 ms |   0.0188 ms |  363.68 MB/s | 296x     |
+| ReasonableRTF_FullSet_Streamed    |    50.362 ms |   0.1449 ms |   0.1356 ms | 2883.36 MB/s | 138x     |
+| ReasonableRTF_NoImageSet_Streamed |     9.854 ms |   0.0143 ms |   0.0119 ms |  359.62 MB/s | 293x     |
 
 - - -
 
