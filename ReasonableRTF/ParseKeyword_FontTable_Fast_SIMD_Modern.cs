@@ -9,10 +9,8 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
-    private RtfError ParseKeyword_FontTable_Fast_Vector128(out KeywordType fontTableKeyword, out int param)
+    private RtfError ParseKeyword_FontTable_Fast_Vector128(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
-        byte[] buffer = _buffer;
-
         bool hasParam = false;
         param = 0;
         Symbol? symbol;
@@ -20,7 +18,7 @@ public sealed partial class RtfToTextConverter
 
         int startingCurrentPos = _currentPos;
 
-        char ch = (char)buffer[IncrementCurrentPos()];
+        char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
         if (!CharExtension.IsAsciiLetter(ch))
         {
@@ -42,7 +40,7 @@ public sealed partial class RtfToTextConverter
         }
         else
         {
-            Vector128<byte> keyword = Vector128.Create(buffer, _currentPos - 1);
+            Vector128<byte> keyword = Vector128.LoadUnsafe(ref GetRefAtPos(ref bufferRef, _currentPos - 1));
             Vector128<byte> asciiLetters = Vector128.GreaterThan((keyword | _hex20_128) - _all_a_128, _z_minus_a_128);
 
             uint notEqualsElements = asciiLetters.ExtractMostSignificantBits();
@@ -60,13 +58,13 @@ public sealed partial class RtfToTextConverter
             keyword = Vector128.BitwiseAnd(keyword, maskVec);
 
             _currentPos += keywordCount;
-            ch = (char)buffer[_currentPos - 1];
+            ch = (char)_buffer[_currentPos - 1];
 
             int negateParam = 0;
             if (ch == '-')
             {
                 negateParam = 1;
-                ch = (char)buffer[IncrementCurrentPos()];
+                ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
             }
             if (CharExtension.IsAsciiDigit(ch))
             {
@@ -78,7 +76,7 @@ public sealed partial class RtfToTextConverter
                         int i;
                         for (i = 0;
                              i < _paramMaxLen + 1 && CharExtension.IsAsciiDigit(ch);
-                             i++, ch = (char)buffer[IncrementCurrentPos()])
+                             i++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
                         {
                             param = (param * 10) + (ch - '0');
                         }
@@ -117,7 +115,7 @@ public sealed partial class RtfToTextConverter
         {
             if (_skipDestinationIfUnknown)
             {
-                SkipDest(null, 0);
+                SkipDest(ref bufferRef, null, 0);
             }
             _skipDestinationIfUnknown = false;
             return RtfError.OK;
@@ -127,7 +125,7 @@ public sealed partial class RtfToTextConverter
 
         fontTableKeyword = symbol.KeywordType;
         return fontTableKeyword < KeywordType.F
-            ? DispatchKeyword(symbol, param, hasParam, null, 0)
+            ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0)
             : RtfError.OK;
     }
 }

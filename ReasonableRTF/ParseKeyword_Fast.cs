@@ -9,16 +9,14 @@ namespace ReasonableRTF;
 public sealed partial class RtfToTextConverter
 {
     // Generated version that doesn't do manual bounds checking, for when we know we're far enough from the end of the buffer
-    private RtfError ParseKeyword_Fast()
+    private RtfError ParseKeyword_Fast(ref byte bufferRef)
     {
-        byte[] buffer = _buffer;
-
         bool hasParam = false;
         int param = 0;
         Symbol? symbol;
 
         // [FenGen:ScalarKeywordParseSection:Fast:Dest:Begin]
-        char ch = (char)buffer[IncrementCurrentPos()];
+        char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
         byte[] keyword = _keyword;
 
@@ -44,7 +42,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(null, 0);
+                    SkipDest(ref bufferRef, null, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -52,14 +50,14 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(symbol, param, hasParam, null, 0);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0);
         }
         else
         {
             byte keywordCount;
             for (keywordCount = 0;
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
-                 keywordCount++, ch = (char)buffer[IncrementCurrentPos()])
+                 keywordCount++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
             {
                 keyword[keywordCount] = (byte)ch;
             }
@@ -72,7 +70,7 @@ public sealed partial class RtfToTextConverter
             if (ch == '-')
             {
                 negateParam = 1;
-                ch = (char)buffer[IncrementCurrentPos()];
+                ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
             }
             if (CharExtension.IsAsciiDigit(ch))
             {
@@ -84,7 +82,7 @@ public sealed partial class RtfToTextConverter
                         int i;
                         for (i = 0;
                              i < _paramMaxLen + 1 && CharExtension.IsAsciiDigit(ch);
-                             i++, ch = (char)buffer[IncrementCurrentPos()])
+                             i++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
                         {
                             param = (param * 10) + (ch - '0');
                         }
@@ -103,7 +101,7 @@ public sealed partial class RtfToTextConverter
             }
 
             _currentPos += MinusOneIfNotSpace_8Bits(ch);
-        // [FenGen:ScalarKeywordParseSection:Fast:Dest:End]
+            // [FenGen:ScalarKeywordParseSection:Fast:Dest:End]
 
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
@@ -111,7 +109,7 @@ public sealed partial class RtfToTextConverter
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(symbol, param, hasParam, null, 0);
+                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0);
             }
             else
             {
@@ -122,7 +120,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(null, 0);
+                    SkipDest(ref bufferRef, null, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -130,7 +128,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(symbol, param, hasParam, keyword, keywordCount);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, keyword, keywordCount);
         }
     }
 }

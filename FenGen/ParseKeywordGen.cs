@@ -20,7 +20,7 @@ internal static class ParseKeywordGen
             SyntaxKind.MethodDeclaration,
             GenAttributes.FenGen_ParseKeywordAttribute);
 
-        const int reqArgCount = 3;
+        const int reqArgCount = 4;
 
         if (attr.ArgumentList is not { Arguments.Count: reqArgCount })
         {
@@ -29,8 +29,9 @@ internal static class ParseKeywordGen
         }
 
         string getByteFunctionName = GetStringParamValue(attr, 0);
-        string bufferName = GetStringParamValue(attr, 1);
+        string bufferRefIncrementFunctionName = GetStringParamValue(attr, 1);
         string incrementFunctionName = GetStringParamValue(attr, 2);
+        string bufferRefName = GetStringParamValue(attr, 3);
 
         if (member is not MethodDeclarationSyntax method)
         {
@@ -71,12 +72,12 @@ internal static class ParseKeywordGen
                 string line = destLines[i];
                 if (IsFenGenNotationLine(line, "[FenGen:ScalarKeywordParseSection:Slow:Dest:Begin]"))
                 {
-                    CopyLines(sourceLines, destLines, destFile, i, "Slow", getByteFunctionName, incrementFunctionName, bufferName);
+                    CopyLines(sourceLines, destLines, destFile, i, "Slow", getByteFunctionName, incrementFunctionName, bufferRefIncrementFunctionName, bufferRefName);
                     break;
                 }
                 else if (IsFenGenNotationLine(line, "[FenGen:ScalarKeywordParseSection:Fast:Dest:Begin]"))
                 {
-                    CopyLines(sourceLines, destLines, destFile, i, "Fast", getByteFunctionName, incrementFunctionName, bufferName);
+                    CopyLines(sourceLines, destLines, destFile, i, "Fast", getByteFunctionName, incrementFunctionName, bufferRefIncrementFunctionName, bufferRefName);
                     break;
                 }
             }
@@ -91,7 +92,8 @@ internal static class ParseKeywordGen
         string version,
         string getByteFunctionName,
         string incrementFunctionName,
-        string bufferName)
+        string bufferRefIncrementFunctionName,
+        string bufferRefName)
     {
         for (int subI = i + 1; subI < destLines.Count; subI++)
         {
@@ -105,7 +107,7 @@ internal static class ParseKeywordGen
                     {
                         sourceLine = sourceLine.Replace(
                             getByteFunctionName + "(" + incrementFunctionName + "())",
-                            bufferName + "[" + incrementFunctionName + "()]"
+                            bufferRefIncrementFunctionName + "(ref " + bufferRefName + ")"
                         );
                     }
                     destLines.Insert(subI, sourceLine);

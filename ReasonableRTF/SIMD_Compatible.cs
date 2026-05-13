@@ -80,8 +80,8 @@ public sealed partial class RtfToTextConverter
 
     // Heavily modified version of .NET SpanHelpers.IndexOfAnyValueType().
     // Made to handle the \binN situation while losing as little performance as possible.
-    private static int SIMD_SkipDest(
-        byte[] buffer,
+    private int SIMD_SkipDest(
+        ref byte bufferRef,
         int startIndex,
         int spanLength)
     {
@@ -92,17 +92,15 @@ public sealed partial class RtfToTextConverter
 
         uint binUInt = BitConverter.IsLittleEndian ? 0x6E69625Cu : 0x5C62696Eu;
 
-        ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
-
         if (spanLength >= Vector<byte>.Count)
         {
-            ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+            ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
             Vector<byte> equalsBraces;
             Vector<byte> equalsBackslash;
             Vector<byte> equals;
             Vector<byte> current;
             ref byte currentSearchSpace = ref searchSpace;
-            ref byte oneVectorAwayFromEnd = ref Unsafe.Add(ref searchSpace, spanLength - Vector<byte>.Count);
+            ref byte oneVectorAwayFromEnd = ref Unsafe.AddByteOffset(ref searchSpace, (nint)(spanLength - Vector<byte>.Count));
 
             // Loop until either we've finished all elements or there's less than a vector's-worth remaining.
             do
@@ -113,7 +111,7 @@ public sealed partial class RtfToTextConverter
                 equals = equalsBraces | equalsBackslash;
                 if (equals == Vector<byte>.Zero)
                 {
-                    currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
+                    currentSearchSpace = ref Unsafe.AddByteOffset(ref currentSearchSpace, (nint)Vector<byte>.Count);
                     continue;
                 }
 
@@ -127,7 +125,7 @@ public sealed partial class RtfToTextConverter
                     {
                         if (ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, Vector<byte>.Count + (_binLength - 1)) <= spanLength)
                         {
-                            Vector<byte> lastBlock = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.Add(ref currentSearchSpace, _binLength - 1));
+                            Vector<byte> lastBlock = Unsafe.ReadUnaligned<Vector<byte>>(ref Unsafe.AddByteOffset(ref currentSearchSpace, _binLength - 1));
                             Vector<byte> lastEquals = Vector.Equals(_nVector, lastBlock);
 
                             Vector<byte> containsBin = Vector.BitwiseAnd(equalsBackslash, lastEquals);
@@ -136,7 +134,7 @@ public sealed partial class RtfToTextConverter
                             {
                                 if (!bracesFound)
                                 {
-                                    currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
+                                    currentSearchSpace = ref Unsafe.AddByteOffset(ref currentSearchSpace, (nint)Vector<byte>.Count);
                                     continue;
                                 }
                                 else
@@ -152,7 +150,7 @@ public sealed partial class RtfToTextConverter
                                     int vectorIndex = LocateFirstFoundByte(mask);
                                     int index = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, vectorIndex);
                                     if (index >= spanLength - sizeof(uint) ||
-                                        Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, index)) == binUInt)
+                                        Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref searchSpace, (nint)index)) == binUInt)
                                     {
                                         if (backslashIndex == -1) backslashIndex = LocateFirstFoundByte(equalsBackslash);
                                         return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
@@ -171,7 +169,7 @@ public sealed partial class RtfToTextConverter
                             {
                                 int spanIndex = ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, currentVectorIndex);
                                 if (spanIndex >= spanLength - sizeof(uint) ||
-                                    Unsafe.ReadUnaligned<uint>(ref Unsafe.Add(ref searchSpace, spanIndex)) == binUInt)
+                                    Unsafe.ReadUnaligned<uint>(ref Unsafe.AddByteOffset(ref searchSpace, (nint)spanIndex)) == binUInt)
                                 {
                                     return startIndex + ComputeFirstIndex(ref searchSpace, ref currentSearchSpace, backslashIndex);
                                 }
@@ -183,7 +181,7 @@ public sealed partial class RtfToTextConverter
 
                         if (!bracesFound)
                         {
-                            currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
+                            currentSearchSpace = ref Unsafe.AddByteOffset(ref currentSearchSpace, (nint)Vector<byte>.Count);
                             continue;
                         }
                         else
@@ -227,8 +225,8 @@ public sealed partial class RtfToTextConverter
     the current position for the next vector load to just after the \par either, because that's still slower for
     some reason. Too many overlapping loads just like the keyword thing, I guess.
     */
-    private static bool SIMD_CopyPlainText(
-        byte[] buffer,
+    private bool SIMD_CopyPlainText(
+        ref byte bufferRef,
         int startIndex,
         int spanLength,
         ListFast<char> plainText,
@@ -239,14 +237,12 @@ public sealed partial class RtfToTextConverter
             return false;
         }
 
-        ReadOnlySpan<byte> span = buffer.AsSpan(startIndex, spanLength);
-
-        ref byte searchSpace = ref MemoryMarshal.GetReference(span);
+        ref byte searchSpace = ref GetRefAtPos(ref bufferRef, startIndex);
 
         if (spanLength >= Vector<byte>.Count)
         {
             ref byte currentSearchSpace = ref searchSpace;
-            ref byte oneVectorAwayFromEnd = ref Unsafe.Add(ref searchSpace, (uint)(spanLength - Vector<byte>.Count));
+            ref byte oneVectorAwayFromEnd = ref Unsafe.AddByteOffset(ref searchSpace, (uint)(spanLength - Vector<byte>.Count));
 
             // Loop until either we've finished all elements or there's less than a vector's-worth remaining.
             do
@@ -273,7 +269,7 @@ public sealed partial class RtfToTextConverter
                 }
 
                 CopyVector(current, Vector<byte>.Count, plainText, ref currentPos);
-                currentSearchSpace = ref Unsafe.Add(ref currentSearchSpace, Vector<byte>.Count);
+                currentSearchSpace = ref Unsafe.AddByteOffset(ref currentSearchSpace, (nint)Vector<byte>.Count);
             } while (!Unsafe.IsAddressGreaterThan(ref currentSearchSpace, ref oneVectorAwayFromEnd));
         }
 

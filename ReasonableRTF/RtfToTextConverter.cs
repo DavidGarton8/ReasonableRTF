@@ -71,6 +71,15 @@ public sealed partial class RtfToTextConverter
 {
     #region Private fields
 
+    // Add one extra to all the known counts because I can't think whether the read increments will put us one
+    // over or not
+    private const int _keywordParseMaxRequiredBytes =
+        1 +
+        1 + 1 +
+        _keywordMaxLen + 1 + 1 +
+        1 + 1 +
+        _paramMaxLen + 1 + 1;
+
     // Officially, the header is supposed to be "{\rtf1", but some files have just "{\rtf" or "{\rtf0" or other
     // crap. RichTextBox also only checks for "{\rtf", no doubt for that very reason.
     private static readonly byte[] _rtfHeaderBytes = @"{\rtf"u8.ToArray();
@@ -2254,7 +2263,16 @@ public sealed partial class RtfToTextConverter
                 return new RtfResult(RtfError.NotAnRtfFile, 0, null);
             }
 
-            RtfError error = ParseRtf();
+            /*
+            TODO: On Framework x86, we're slower than before we added the bufferRef stuff. But if we disable the
+            bufferRef stuff for x86, we're even slower still.
+            */
+
+            // Avoid bounds checks by passing a buffer reference everywhere. We do our own bounds checking.
+            ReadOnlySpan<byte> bufferSpan = _buffer.AsSpan();
+            ref byte bufferRef = ref MemoryMarshal.GetReference(bufferSpan);
+
+            RtfError error = ParseRtf(ref bufferRef);
             if (error == RtfError.OK)
             {
                 return new RtfResult(CreateReturnStringFromChars(_plainText));
@@ -2299,21 +2317,19 @@ public sealed partial class RtfToTextConverter
 
     #region Parse
 
-    private RtfError ParseRtf()
+    private RtfError ParseRtf(ref byte bufferRef)
     {
-        byte[] buffer = _buffer;
-
         while (!_reachedEndOfStream)
         {
             while (_currentPos < _currentBufferChunkLength)
             {
-                char ch = (char)buffer[IncrementCurrentPos()];
+                char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 // Ordered by most frequently appearing first
                 switch (ch)
                 {
                     case '\\':
-                        RtfError ec = ParseKeyword();
+                        RtfError ec = ParseKeyword(ref bufferRef);
                         if (ec != RtfError.OK) return ec;
                         break;
                     case '{':
@@ -2334,7 +2350,7 @@ public sealed partial class RtfToTextConverter
                         {
                             // No measurable perf loss from this, and it lets us avoid duplicating the loop body.
                             char currentChar = (char)(_currentPos < _currentBufferChunkLength
-                                ? buffer[_currentPos]
+                                ? GetByteAtPos(ref bufferRef, _currentPos)
                                 : GetByte(_currentPos));
 
                             if (_isNonPlainText[currentChar])
@@ -2352,7 +2368,7 @@ public sealed partial class RtfToTextConverter
                             }
                             else
                             {
-                                HandlePlainTextRun();
+                                HandlePlainTextRun(ref bufferRef);
                             }
                         }
                         break;
@@ -2366,68 +2382,52 @@ public sealed partial class RtfToTextConverter
         return _groupStackCount > 0 ? RtfError.UnmatchedBrace : RtfError.OK;
     }
 
-    private RtfError ParseKeyword()
+    private RtfError ParseKeyword(ref byte bufferRef)
     {
-        // Add one extra to all the known counts because I can't think whether the read increments will put us
-        // one over or not
-        if (_currentPos < (_currentBufferChunkLength - 1) - (
-                1 + 1 +
-                _keywordMaxLen + 1 + 1 +
-                1 + 1 +
-                _paramMaxLen + 1 + 1
-            ))
+        if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
         {
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_Fast_Vector128();
-                return result == RtfError.KeywordTooLong ? ParseKeyword_Fast() : result;
+                RtfError result = ParseKeyword_Fast_Vector128(ref bufferRef);
+                return result == RtfError.KeywordTooLong ? ParseKeyword_Fast(ref bufferRef) : result;
             }
             else
 #endif
             {
-                return ParseKeyword_Fast();
+                return ParseKeyword_Fast(ref bufferRef);
             }
         }
         else
         {
-            return ParseKeyword_Slow();
+            return ParseKeyword_Slow(ref bufferRef);
         }
     }
 
-    private RtfError ParseKeyword_FontTable(out KeywordType fontTableKeyword, out int param)
+    private RtfError ParseKeyword_FontTable(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
     {
-        // Add one extra to all the known counts because I can't think whether the read increments will put us
-        // one over or not
-        if (_currentPos < (_currentBufferChunkLength - 1) - (
-                1 + 1 +
-                _keywordMaxLen + 1 + 1 +
-                1 + 1 +
-                _paramMaxLen + 1 + 1
-            ))
+        if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
         {
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_FontTable_Fast_Vector128(out fontTableKeyword, out param);
-                return result == RtfError.KeywordTooLong ? ParseKeyword_FontTable_Fast(out fontTableKeyword, out param) : result;
+                RtfError result = ParseKeyword_FontTable_Fast_Vector128(ref bufferRef, out fontTableKeyword, out param);
+                return result == RtfError.KeywordTooLong ? ParseKeyword_FontTable_Fast(ref bufferRef, out fontTableKeyword, out param) : result;
             }
             else
 #endif
             {
-                return ParseKeyword_FontTable_Fast(out fontTableKeyword, out param);
+                return ParseKeyword_FontTable_Fast(ref bufferRef, out fontTableKeyword, out param);
             }
         }
         else
         {
-            return ParseKeyword_FontTable_Slow(out fontTableKeyword, out param);
+            return ParseKeyword_FontTable_Slow(ref bufferRef, out fontTableKeyword, out param);
         }
     }
 
-    private RtfError ParseFontTable()
+    private RtfError ParseFontTable(ref byte bufferRef)
     {
-        byte[] buffer = _buffer;
-
         // Prevent stack overflow from maliciously-crafted rtf files - we should never recurse back into here in
         // a spec-conforming file.
         if (_inFontTable) return RtfError.AbortedForSafety;
@@ -2444,7 +2444,7 @@ public sealed partial class RtfToTextConverter
         {
             while (_currentPos < _currentBufferChunkLength)
             {
-                char ch = (char)buffer[IncrementCurrentPos()];
+                char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 switch (ch)
                 {
@@ -2484,7 +2484,7 @@ public sealed partial class RtfToTextConverter
                         }
                         break;
                     case '\\':
-                        RtfError ec = ParseKeyword_FontTable(out KeywordType fontTableKeyword, out int param);
+                        RtfError ec = ParseKeyword_FontTable(ref bufferRef, out KeywordType fontTableKeyword, out int param);
                         if (ec != RtfError.OK) return ec;
 
                         if (fontTableKeyword == KeywordType.F)
@@ -2519,8 +2519,8 @@ public sealed partial class RtfToTextConverter
                             currentFontAcquired && currentFontSymbolFont == SymbolFont.Unset)
                         {
                             currentFontSymbolFont = ShouldUseSimdFontNameCodePath()
-                                ? SIMD_TryGetFontName(buffer, ch, ref _currentPos)
-                                : GetSymbolFont_Scalar(ch);
+                                ? SIMD_TryGetFontName(ref bufferRef, ch, ref _currentPos)
+                                : GetSymbolFont_Scalar(ref bufferRef, ch);
 
                             if (currentFontNumber != NoFontNumber)
                             {
@@ -2556,14 +2556,12 @@ public sealed partial class RtfToTextConverter
                System.Runtime.Intrinsics.Vector256.IsHardwareAccelerated ||
                System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated;
 #else
-        return System.Numerics.Vector.IsHardwareAccelerated && _vectorLengthFitsInAByte && _currentPos < _currentBufferChunkLength - (System.Numerics.Vector<byte>.Count + 1);
+        return System.Numerics.Vector.IsHardwareAccelerated && _vectorLengthFitsInAByte;
 #endif
     }
 
-    private SymbolFont GetSymbolFont_Scalar(char ch, int symbolFontNameCountStart = 0)
+    private SymbolFont GetSymbolFont_Scalar(ref byte bufferRef, char ch, int symbolFontNameCountStart = 0)
     {
-        byte[] buffer = _buffer;
-
         int symbolFontNameCount;
         bool isNonSemicolonSeparatorChar = false;
         if (_currentPos < _currentBufferChunkLength - (_maxSymbolFontNameLength + 1))
@@ -2572,7 +2570,7 @@ public sealed partial class RtfToTextConverter
                  symbolFontNameCount < _maxSymbolFontNameLength &&
                  ch != ';' &&
                  !(isNonSemicolonSeparatorChar = _isNonPlainText[(byte)ch]);
-                 symbolFontNameCount++, ch = (char)buffer[IncrementCurrentPos()])
+                 symbolFontNameCount++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
             {
                 _symbolFontNameBuffer[symbolFontNameCount] = (byte)ch;
             }
@@ -2638,10 +2636,8 @@ public sealed partial class RtfToTextConverter
 
     #endregion
 
-    private void HandlePlainTextRun()
+    private void HandlePlainTextRun(ref byte bufferRef)
     {
-        byte[] buffer = _buffer;
-
         _currentPos--;
 
         SymbolFont symbolFont = GroupStack_CurrentSymbolFont;
@@ -2652,7 +2648,7 @@ public sealed partial class RtfToTextConverter
             {
                 while (_currentPos < _currentBufferChunkLength)
                 {
-                    char ch = (char)buffer[IncrementCurrentPos()];
+                    char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     if (!_isNonPlainText[(byte)ch])
                     {
                         GetCharFromConversionList_Byte((byte)ch, table, out ListFast<char> result);
@@ -2673,7 +2669,7 @@ public sealed partial class RtfToTextConverter
             if (System.Numerics.Vector.IsHardwareAccelerated)
             {
                 bool finishedOnNonPlainTextChar = SIMD_CopyPlainText(
-                    buffer,
+                    ref bufferRef,
                     _currentPos,
                     _currentBufferChunkLength - _currentPos,
                     _plainText,
@@ -2690,7 +2686,7 @@ public sealed partial class RtfToTextConverter
             {
                 for (int i = 0; i < _plainTextRunFastPathAmountBackFromBufferEnd; i++)
                 {
-                    char ch = (char)buffer[IncrementCurrentPos()];
+                    char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     if (!_isNonPlainText[(byte)ch])
                     {
                         _plainText.ItemsArray[_plainText.Count++] = ch;
@@ -2705,11 +2701,11 @@ public sealed partial class RtfToTextConverter
 
             if (System.Numerics.Vector.IsHardwareAccelerated)
             {
-                // Break out of the scalar loop at the buffer boundary, so that if the plaintext run continues after
-                // the next buffer load, we'll be able to jump back into a SIMD parse.
+                // Break out of the scalar loop at the buffer boundary, so that if the plaintext run continues
+                // after the next buffer load, we'll be able to jump back into a SIMD parse.
                 while (_currentPos < _currentBufferChunkLength)
                 {
-                    char ch = (char)buffer[IncrementCurrentPos()];
+                    char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     if (!_isNonPlainText[(byte)ch])
                     {
                         _plainText.Add(ch);
@@ -2727,7 +2723,7 @@ public sealed partial class RtfToTextConverter
                 {
                     while (_currentPos < _currentBufferChunkLength)
                     {
-                        char ch = (char)buffer[IncrementCurrentPos()];
+                        char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         if (!_isNonPlainText[(byte)ch])
                         {
                             _plainText.Add(ch);
@@ -2748,7 +2744,7 @@ public sealed partial class RtfToTextConverter
     #region Act on keywords
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private RtfError DispatchKeyword(Symbol symbol, int param, bool hasParam, byte[]? keyword, int keywordLength)
+    private RtfError DispatchKeyword(ref byte bufferRef, Symbol symbol, int param, bool hasParam, byte[]? keyword, int keywordLength)
     {
         if (!GroupStack_CurrentSkipDest)
         {
@@ -2763,22 +2759,22 @@ public sealed partial class RtfToTextConverter
                     return RtfError.OK;
                 case KeywordType.Special:
                     SpecialType specialType = (SpecialType)symbol.Index;
-                    return DispatchSpecialKeyword(specialType, symbol, param);
+                    return DispatchSpecialKeyword(ref bufferRef, specialType, symbol, param);
                 case KeywordType.Destination:
                     DestinationType destType = (DestinationType)symbol.Index;
                     if (destType == DestinationType.SkippableHex)
                     {
-                        return HandleSkippableHexData(param);
+                        return HandleSkippableHexData(ref bufferRef, param);
                     }
                     else
                     {
                         switch (destType)
                         {
                             case DestinationType.Skip:
-                                SkipDest(keyword, keywordLength);
+                                SkipDest(ref bufferRef, keyword, keywordLength);
                                 return RtfError.OK;
                             case DestinationType.FieldInstruction:
-                                return HandleFieldInstruction();
+                                return HandleFieldInstruction(ref bufferRef);
                             // Stupid crazy type of control word, see description for enum field
                             case DestinationType.CanBeDestOrNotDest:
                             default:
@@ -2795,12 +2791,12 @@ public sealed partial class RtfToTextConverter
             {
                 case KeywordType.Destination:
                     return symbol.Index == (int)DestinationType.SkippableHex
-                        ? HandleSkippableHexData(param)
+                        ? HandleSkippableHexData(ref bufferRef, param)
                         : RtfError.OK;
                 case KeywordType.Special:
                     SpecialType specialType = (SpecialType)symbol.Index;
                     return specialType == SpecialType.SkipNumberOfBytes
-                        ? DispatchSpecialKeyword(specialType, symbol, param)
+                        ? DispatchSpecialKeyword(ref bufferRef, specialType, symbol, param)
                         : RtfError.OK;
                 default:
                     return RtfError.OK;
@@ -2808,12 +2804,12 @@ public sealed partial class RtfToTextConverter
         }
     }
 
-    private RtfError DispatchSpecialKeyword(SpecialType specialType, Symbol symbol, int param)
+    private RtfError DispatchSpecialKeyword(ref byte bufferRef, SpecialType specialType, Symbol symbol, int param)
     {
         switch (specialType)
         {
             case SpecialType.HexEncodedChar:
-                HandleHexRun();
+                HandleHexRun(ref bufferRef);
                 break;
             case SpecialType.SkipNumberOfBytes:
                 if (symbol.UseDefaultParam) param = symbol.DefaultParam;
@@ -2822,8 +2818,8 @@ public sealed partial class RtfToTextConverter
                 break;
             case SpecialType.UnicodeChar:
             {
-                HandleUnicodeParamAndSkipFallbackChars(param);
-                RtfError error = HandleUnicodeRun();
+                HandleUnicodeParamAndSkipFallbackChars(ref bufferRef, param);
+                RtfError error = HandleUnicodeRun(ref bufferRef);
                 if (error != RtfError.OK) return error;
                 break;
             }
@@ -2839,7 +2835,7 @@ public sealed partial class RtfToTextConverter
                 break;
             case SpecialType.FontTable:
             {
-                RtfError error = ParseFontTable();
+                RtfError error = ParseFontTable(ref bufferRef);
                 if (error != RtfError.OK) return error;
                 break;
             }
@@ -3004,7 +3000,7 @@ public sealed partial class RtfToTextConverter
         }
     }
 
-    private void HandleHexRun()
+    private void HandleHexRun(ref byte bufferRef)
     {
         _hexBuffer.ClearFast();
 
@@ -3013,12 +3009,10 @@ public sealed partial class RtfToTextConverter
         byte byte1;
         byte byte2;
 
-        byte[] buffer = _buffer;
-
         if (_currentPos < _currentBufferChunkLength - 1)
         {
-            byte1 = buffer[IncrementCurrentPos()];
-            byte2 = buffer[IncrementCurrentPos()];
+            byte1 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
+            byte2 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
         }
         else
         {
@@ -3031,14 +3025,14 @@ public sealed partial class RtfToTextConverter
         // TODO: Manually duplicated code for performance - should be automated if possible
         while (_currentPos < _currentBufferChunkLength - 3)
         {
-            byte b = buffer[IncrementCurrentPos()];
+            byte b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
             if (b == (byte)'\\')
             {
-                b = buffer[IncrementCurrentPos()];
+                b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                 if (b == (byte)'\'')
                 {
-                    byte1 = buffer[IncrementCurrentPos()];
-                    byte2 = buffer[IncrementCurrentPos()];
+                    byte1 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
+                    byte2 = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     AddByteToHexBuffer(byte1, byte2);
                 }
                 else
@@ -3109,27 +3103,25 @@ public sealed partial class RtfToTextConverter
 
     #region Unicode
 
-    private RtfError HandleUnicodeRun()
+    private RtfError HandleUnicodeRun(ref byte bufferRef)
     {
-        byte[] buffer = _buffer;
-
         // TODO: Manually duplicated code for performance - should be automated if possible
         while (_currentPos < (_currentBufferChunkLength - (3 + _paramMaxLen + 1 + 1)))
         {
-            char ch = (char)buffer[IncrementCurrentPos()];
+            char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
             if (ch == '\\')
             {
-                ch = (char)buffer[IncrementCurrentPos()];
+                ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 if (ch == 'u')
                 {
-                    ch = (char)buffer[IncrementCurrentPos()];
+                    ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                     int negateParam = 0;
                     if (ch == '-')
                     {
                         negateParam = 1;
-                        ch = (char)buffer[IncrementCurrentPos()];
+                        ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
                     }
                     if (CharExtension.IsAsciiDigit(ch))
                     {
@@ -3142,7 +3134,7 @@ public sealed partial class RtfToTextConverter
                                 int i;
                                 for (i = 0;
                                      i < _paramMaxLen + 1 && CharExtension.IsAsciiDigit(ch);
-                                     i++, ch = (char)buffer[IncrementCurrentPos()])
+                                     i++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
                                 {
                                     param = (param * 10) + (ch - '0');
                                 }
@@ -3164,7 +3156,7 @@ public sealed partial class RtfToTextConverter
                         characters) that is not counted in the characters to skip."
                         */
                         _currentPos += MinusOneIfNotSpace_8Bits(ch);
-                        HandleUnicodeParamAndSkipFallbackChars(param);
+                        HandleUnicodeParamAndSkipFallbackChars(ref bufferRef, param);
                     }
                     else
                     {
@@ -3239,7 +3231,7 @@ public sealed partial class RtfToTextConverter
                         characters) that is not counted in the characters to skip."
                         */
                         _currentPos += MinusOneIfNotSpace_8Bits(ch);
-                        HandleUnicodeParamAndSkipFallbackChars(param);
+                        HandleUnicodeParamAndSkipFallbackChars(ref bufferRef, param);
                     }
                     else
                     {
@@ -3294,13 +3286,11 @@ public sealed partial class RtfToTextConverter
         }
     }
 
-    private void HandleUnicodeParamAndSkipFallbackChars(int param)
+    private void HandleUnicodeParamAndSkipFallbackChars(ref byte bufferRef, int param)
     {
         // Make sure the code point is normalized before adding it to the buffer!
         NormalizeUnicodePoint_HandleSymbolCharRange(param, out uint codePoint);
         AddCodePointToUnicodeBuffer(codePoint);
-
-        byte[] buffer = _buffer;
 
         /*
         The spec states that, for the purposes of Unicode fallback character skipping, a "character" could mean
@@ -3319,19 +3309,19 @@ public sealed partial class RtfToTextConverter
         // TODO: Manually duplicated code for performance - should be automated if possible
         while (numToSkip > 0 && _currentPos < _currentBufferChunkLength - 5)
         {
-            char c = (char)buffer[IncrementCurrentPos()];
+            char c = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
             switch (c)
             {
                 case '\\':
-                    if (buffer[IncrementCurrentPos()] == '\'')
+                    if (GetByteAtCurrentPosAndIncrement(ref bufferRef) == '\'')
                     {
-                        byte b = buffer[IncrementCurrentPos()];
+                        byte b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         if (!CharExtension.IsAsciiHexDigit((char)b))
                         {
                             _currentPos--;
                             break;
                         }
-                        b = buffer[IncrementCurrentPos()];
+                        b = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         if (!CharExtension.IsAsciiHexDigit((char)b))
                         {
                             _currentPos -= 2;
@@ -3339,9 +3329,9 @@ public sealed partial class RtfToTextConverter
                         }
                         numToSkip--;
                     }
-                    else if (_isSeparatorChar[buffer[IncrementCurrentPos()]])
+                    else if (_isSeparatorChar[GetByteAtCurrentPosAndIncrement(ref bufferRef)])
                     {
-                        _ = buffer[IncrementCurrentPos()];
+                        _ = GetByteAtCurrentPosAndIncrement(ref bufferRef);
                         numToSkip--;
                     }
                     else
@@ -3623,9 +3613,9 @@ public sealed partial class RtfToTextConverter
     -Supports 0xF000-0xF0FF stuff (but maybe by accident of weird multi-byte behavior?)
      We should probably just say it doesn't support it because it doesn't make sense for Unicode.
     */
-    private RtfError HandleFieldInstruction()
+    private RtfError HandleFieldInstruction(ref byte bufferRef)
     {
-        if (GroupStack_CurrentPropertyHidden != 0) return RewindAndSkipGroup();
+        if (GroupStack_CurrentPropertyHidden != 0) return RewindAndSkipGroup(ref bufferRef);
 
         _fldinstSymbolNumber.ClearFast();
         _fldinstSymbolFontName.ClearFast();
@@ -3640,7 +3630,7 @@ public sealed partial class RtfToTextConverter
             byte b = GetByte(IncrementCurrentPos());
             if (b != SYMBOLName[i])
             {
-                return RewindAndSkipGroup();
+                return RewindAndSkipGroup(ref bufferRef);
             }
         }
 
@@ -3654,7 +3644,7 @@ public sealed partial class RtfToTextConverter
 
         if (ch == '-')
         {
-            return RewindAndSkipGroup();
+            return RewindAndSkipGroup(ref bufferRef);
         }
 
         #region Handle if the param is hex
@@ -3667,7 +3657,7 @@ public sealed partial class RtfToTextConverter
                 ch = (char)GetByte(IncrementCurrentPos());
                 if (ch == '-')
                 {
-                    return RewindAndSkipGroup();
+                    return RewindAndSkipGroup(ref bufferRef);
                 }
                 numIsHex = true;
             }
@@ -3692,7 +3682,7 @@ public sealed partial class RtfToTextConverter
             i >= _fldinstSymbolNumberMaxLen ||
             (!numIsHex && alphaCharsFound))
         {
-            return RewindAndSkipGroup();
+            return RewindAndSkipGroup(ref bufferRef);
         }
 
         #endregion
@@ -3707,7 +3697,7 @@ public sealed partial class RtfToTextConverter
                     NumberFormatInfo.InvariantInfo,
                     out param))
             {
-                return RewindAndSkipGroup();
+                return RewindAndSkipGroup(ref bufferRef);
             }
         }
         else
@@ -3719,7 +3709,7 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                return RewindAndSkipGroup();
+                return RewindAndSkipGroup(ref bufferRef);
             }
         }
 
@@ -3727,7 +3717,7 @@ public sealed partial class RtfToTextConverter
 
         #endregion
 
-        if (ch != ' ') return RewindAndSkipGroup();
+        if (ch != ' ') return RewindAndSkipGroup(ref bufferRef);
 
         const int maxParams = 6;
 
@@ -3750,7 +3740,7 @@ public sealed partial class RtfToTextConverter
             if (ch == 'a')
             {
                 HandleFieldInst_A(param);
-                return RewindAndSkipGroup();
+                return RewindAndSkipGroup(ref bufferRef);
             }
             /*
             From the spec:
@@ -3763,12 +3753,12 @@ public sealed partial class RtfToTextConverter
             else if (ch == 'j')
             {
                 HandleFieldInst_J(param);
-                return RewindAndSkipGroup();
+                return RewindAndSkipGroup(ref bufferRef);
             }
             else if (ch == 'u')
             {
                 HandleFieldInst_U(param);
-                return RewindAndSkipGroup();
+                return RewindAndSkipGroup(ref bufferRef);
             }
             /*
             From the spec:
@@ -3792,7 +3782,7 @@ public sealed partial class RtfToTextConverter
                 if (_isSeparatorChar[(byte)ch])
                 {
                     HandleFieldInst_F_Bare(param);
-                    return RewindAndSkipGroup();
+                    return RewindAndSkipGroup(ref bufferRef);
                 }
                 else if (ch == ' ')
                 {
@@ -3800,7 +3790,7 @@ public sealed partial class RtfToTextConverter
                     if (ch != '\"')
                     {
                         HandleFieldInst_F_Bare(param);
-                        return RewindAndSkipGroup();
+                        return RewindAndSkipGroup(ref bufferRef);
                     }
 
                     int fontNameCharCount = 0;
@@ -3809,7 +3799,7 @@ public sealed partial class RtfToTextConverter
                     {
                         if (fontNameCharCount >= _maxSymbolFontNameLength || _isSeparatorChar[(byte)ch])
                         {
-                            return RewindAndSkipGroup();
+                            return RewindAndSkipGroup(ref bufferRef);
                         }
                         _fldinstSymbolFontName.Add(ch);
                         fontNameCharCount++;
@@ -3823,7 +3813,7 @@ public sealed partial class RtfToTextConverter
                         if (SeqEqual(_fldinstSymbolFontName, symbolChars))
                         {
                             HandleFieldInst_F_WithSymbolFontName(param, symbolFontTable);
-                            return RewindAndSkipGroup();
+                            return RewindAndSkipGroup(ref bufferRef);
                         }
                     }
                 }
@@ -3849,14 +3839,14 @@ public sealed partial class RtfToTextConverter
             else if (ch == 's')
             {
                 ch = (char)GetByte(IncrementCurrentPos());
-                if (ch != ' ') return RewindAndSkipGroup();
+                if (ch != ' ') return RewindAndSkipGroup(ref bufferRef);
 
                 int numDigitCount = 0;
                 while (CharExtension.IsAsciiDigit(ch = (char)GetByte(IncrementCurrentPos())))
                 {
                     if (numDigitCount > _fldinstSymbolNumberMaxLen)
                     {
-                        return RewindAndSkipGroup();
+                        return RewindAndSkipGroup(ref bufferRef);
                     }
                     numDigitCount++;
                 }
@@ -3867,14 +3857,14 @@ public sealed partial class RtfToTextConverter
 
         #endregion
 
-        return RewindAndSkipGroup();
+        return RewindAndSkipGroup(ref bufferRef);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private RtfError RewindAndSkipGroup()
+    private RtfError RewindAndSkipGroup(ref byte bufferRef)
     {
         _currentPos--;
-        SkipDest(null, 0);
+        SkipDest(ref bufferRef, null, 0);
         return RtfError.OK;
     }
 
@@ -4393,15 +4383,15 @@ public sealed partial class RtfToTextConverter
                 }
                 else
                 {
-                    return _bufferLength;
+                    return _currentBufferChunkLength;
                 }
             }
         }
 
-        return _bufferLength;
+        return _currentBufferChunkLength;
     }
 
-    private RtfError HandleSkippableHexData(int param)
+    private RtfError HandleSkippableHexData(ref byte bufferRef, int param)
     {
         bool insertSpaceIfNecessary = param == 1;
 
@@ -4412,13 +4402,11 @@ public sealed partial class RtfToTextConverter
 
         int startGroupLevel = _groupStackCount;
 
-        byte[] buffer = _buffer;
-
         while (!_reachedEndOfStream)
         {
             while (_currentPos < _currentBufferChunkLength)
             {
-                char ch = (char)buffer[IncrementCurrentPos()];
+                char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
 
                 switch (ch)
                 {
@@ -4442,7 +4430,7 @@ public sealed partial class RtfToTextConverter
                         break;
                     case '\\':
                         // This implicitly also handles the case where the data is \binN instead of hex
-                        RtfError ec = ParseKeyword();
+                        RtfError ec = ParseKeyword(ref bufferRef);
                         if (ec != RtfError.OK) return ec;
                         break;
                     case '\r':
@@ -4470,7 +4458,7 @@ public sealed partial class RtfToTextConverter
         return RtfError.OK;
     }
 
-    private void SkipDest(byte[]? keyword, int keywordLength)
+    private void SkipDest(ref byte bufferRef, byte[]? keyword, int keywordLength)
     {
         // This method should either skip the entire destination in one go, or else bail and use the slow path
         // for the rest of the destination.
@@ -4486,11 +4474,9 @@ public sealed partial class RtfToTextConverter
         int index = _currentPos;
         if (System.Numerics.Vector.IsHardwareAccelerated)
         {
-            byte[] buffer = _buffer;
-
             while (!_reachedEndOfStream)
             {
-                index = SIMD_SkipDest(buffer, index, _currentBufferChunkLength - index);
+                index = SIMD_SkipDest(ref bufferRef, index, _currentBufferChunkLength - index);
 
                 /*
                 Curly braces can be escaped like \{ and \}. But there can be an arbitrary amount of backslashes
@@ -4499,12 +4485,14 @@ public sealed partial class RtfToTextConverter
                 back in the stream, which we can't do. So if we don't find the end of our subgroup stack in the
                 current buffer chunk, just give up and take the slow path that properly parses escapes.
                 */
-                if (index == -1 || buffer[index - 1] == '\\')
+                if (index <= 0 ||
+                    index >= _currentBufferChunkLength ||
+                    GetByteAtPos(ref bufferRef, index - 1) == '\\')
                 {
                     _groupStackCount = startGroupLevel;
                     return;
                 }
-                switch (buffer[index])
+                switch (GetByteAtPos(ref bufferRef, index))
                 {
                     case (byte)'{':
                         ++_groupStackCount;
@@ -4521,9 +4509,9 @@ public sealed partial class RtfToTextConverter
                     // the raw binary.
                     case (byte)'\\':
                         if (index > _currentBufferChunkLength - _binLength ||
-                            (buffer[index + 1] == 'b' &&
-                             buffer[index + 2] == 'i' &&
-                             buffer[index + 3] == 'n'))
+                            (GetByteAtPos(ref bufferRef, index + 1) == 'b' &&
+                             GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
+                             GetByteAtPos(ref bufferRef, index + 3) == 'n'))
                         {
                             _groupStackCount = startGroupLevel;
                             return;
@@ -4559,24 +4547,22 @@ public sealed partial class RtfToTextConverter
                 return;
             }
 
-            byte[] buffer = _buffer;
-
             for (; index < _currentBufferChunkLength - _binLength; index++)
             {
-                char ch = (char)buffer[index];
+                char ch = (char)GetByteAtPos(ref bufferRef, index);
                 switch (ch)
                 {
                     case '\\':
                         byte nextChar;
                         if (index > _currentBufferChunkLength - _binLength ||
-                            ((nextChar = buffer[index + 1]) == 'b' &&
-                             buffer[index + 2] == 'i' &&
-                             buffer[index + 3] == 'n'))
+                            ((nextChar = GetByteAtPos(ref bufferRef, index + 1)) == 'b' &&
+                             GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
+                             GetByteAtPos(ref bufferRef, index + 3) == 'n'))
                         {
                             _groupStackCount = startGroupLevel;
                             return;
                         }
-                        else if (index < _currentBufferChunkLength - 4 && FoundSkipDataKeyword(buffer, index + 1))
+                        else if (index < _currentBufferChunkLength - sizeof(uint) && FoundSkipDataKeyword(ref bufferRef, index + 1))
                         {
                             _groupStackCount = startGroupLevel;
                             return;
@@ -4604,6 +4590,10 @@ public sealed partial class RtfToTextConverter
         }
     }
 
+    // After testing a number of different methods of keyword detection, this came out the fastest. There are
+    // only six letters our keywords can start with, so any other letter will be rejected with a single array
+    // access and a null check.
+
     private static bool FoundSkipDataKeyword(byte[] buffer, int index)
     {
         // After testing a number of different methods of keyword detection, this came out the fastest. There are
@@ -4625,9 +4615,47 @@ public sealed partial class RtfToTextConverter
         return false;
     }
 
+    private bool FoundSkipDataKeyword(ref byte bufferRef, int index)
+    {
+        SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos(ref bufferRef, index)];
+        if (keyword != null)
+        {
+            uint value = Unsafe.ReadUnaligned<uint>(ref GetRefAtPos(ref bufferRef, index));
+            if (((value & keyword.Id) != 0) ||
+                (keyword.UseExtra &&
+                 (((value & keyword.Id2) != 0) || ((value & keyword.Id3) != 0))))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     #endregion
 
     #region Read and seek wrappers
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private byte GetByteAtCurrentPosAndIncrement(ref byte bufferRef)
+    {
+        Debug.Assert(_currentPos < _currentBufferChunkLength);
+        return Unsafe.ReadUnaligned<byte>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)IncrementCurrentPos()));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private byte GetByteAtPos(ref byte bufferRef, int pos)
+    {
+        Debug.Assert(pos < _currentBufferChunkLength);
+        return Unsafe.ReadUnaligned<byte>(ref Unsafe.AddByteOffset(ref bufferRef, (nint)pos));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ref byte GetRefAtPos(ref byte bufferRef, int pos)
+    {
+        Debug.Assert(pos < _currentBufferChunkLength);
+        return ref Unsafe.AddByteOffset(ref bufferRef, (nint)pos);
+    }
 
     /// <summary>
     /// Increment _currentPos. Behaves like _currentPos++, returning the value before it was modified.
@@ -4635,16 +4663,7 @@ public sealed partial class RtfToTextConverter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int IncrementCurrentPos()
     {
-        /*
-        This is by far the most frequently called increment function, so do a crazy trick and rely on the already
-        existent bounds checker in the rtf array getter to handle the chunk advance for us. That way, we can just
-        have this bare, inlinable increment to make the byte array path faster, and the streaming path also cuts
-        way down on branches too, only doing extra work when it gets to the end of a block, and otherwise just
-        running the array getter bounds checker which was already being run anyway.
-        We don't quite get back to the previous speed even for the byte array path, but we get closer.
-
-        Also, this performs better than raw _currentPos++, inexplicably. Sure?
-        */
+        // This performs better than raw _currentPos++, inexplicably. Sure?
         return _currentPos++;
     }
 
@@ -4756,7 +4775,7 @@ public sealed partial class RtfToTextConverter
     }
 
     /// <summary>
-    /// Manually bounds-checked past <see cref="T:_bufferLength"/>.
+    /// Manually bounds-checked past <see cref="T:_currentBufferChunkLength"/>.
     /// Now that we have stream support, this method should always be called for array accesses to ensure the
     /// chunks are loaded when needed. Only access <see cref="T:Array"/> directly in cases where you know for
     /// sure you don't need the chunk load triggering in your particular scenario.

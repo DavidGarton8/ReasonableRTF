@@ -38,92 +38,93 @@ public sealed partial class RtfToTextConverter
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private SymbolFont SIMD_TryGetFontName(
-        byte[] buffer,
+        ref byte bufferRef,
         char ch,
         ref int currentPos)
     {
-        currentPos--;
-
-        Vector<byte> vector = new Vector<byte>(buffer, currentPos);
-        Vector<byte> equalsTerminatingChar =
-            Vector.Equals(_zeroVector, vector) |
-            Vector.Equals(_lfVector, vector) |
-            Vector.Equals(_crVector, vector) |
-            Vector.Equals(_backslashVector, vector) |
-            Vector.Equals(_openBraceVector, vector) |
-            Vector.Equals(_closingBraceVector, vector) |
-            Vector.Equals(_semicolonVector, vector);
-
-        if (equalsTerminatingChar != Vector<byte>.Zero)
+        if (_currentPos < _currentBufferChunkLength - (Vector<byte>.Count + 1))
         {
-            int terminatingCharIndex = LocateFirstFoundByte(equalsTerminatingChar);
-            ch = (char)vector[terminatingCharIndex];
+            currentPos--;
 
-            if (EarlyOut(terminatingCharIndex, ref currentPos, ch))
+            Vector<byte> vector = Unsafe.ReadUnaligned<Vector<byte>>(ref GetRefAtPos(ref bufferRef, _currentPos));
+            Vector<byte> equalsTerminatingChar =
+                Vector.Equals(_zeroVector, vector) |
+                Vector.Equals(_lfVector, vector) |
+                Vector.Equals(_crVector, vector) |
+                Vector.Equals(_backslashVector, vector) |
+                Vector.Equals(_openBraceVector, vector) |
+                Vector.Equals(_closingBraceVector, vector) |
+                Vector.Equals(_semicolonVector, vector);
+
+            if (equalsTerminatingChar != Vector<byte>.Zero)
             {
-                return SymbolFont.None;
-            }
+                int terminatingCharIndex = LocateFirstFoundByte(equalsTerminatingChar);
+                ch = (char)vector[terminatingCharIndex];
 
-            Vector<byte> maskVec = Vector.GreaterThan(new Vector<byte>((byte)terminatingCharIndex), _indexVec);
-            Vector<byte> fontName = Vector.BitwiseAnd(vector, maskVec);
-
-            return TryFindSymbolFont(fontName, _symbolFontNameVectors, ref currentPos, ch, terminatingCharIndex);
-        }
-        else
-        {
-            ch = (char)buffer[currentPos + Vector<byte>.Count];
-            if (ch == ';' || _isNonPlainText[(byte)ch])
-            {
-                if (EarlyOut(Vector<byte>.Count, ref currentPos, ch))
+                if (EarlyOut(terminatingCharIndex))
                 {
+                    currentPos += ch == ';' ? terminatingCharIndex + 1 : terminatingCharIndex;
                     return SymbolFont.None;
                 }
 
-                return TryFindSymbolFont(vector, _symbolFontNameVectors, ref currentPos, ch, Vector<byte>.Count);
+                Vector<byte> maskVec = Vector.GreaterThan(new Vector<byte>((byte)terminatingCharIndex), _indexVec);
+                Vector<byte> fontName = Vector.BitwiseAnd(vector, maskVec);
+
+                currentPos += ch == ';' ? terminatingCharIndex + 1 : terminatingCharIndex;
+                return TryFindSymbolFont(fontName, _symbolFontNameVectors);
             }
             else
             {
-                currentPos += Vector<byte>.Count;
-                if (Vector<byte>.Count < _maxSupportedSymbolFontNameLength)
+                ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector<byte>.Count);
+                if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
-                    vector.CopyTo(_symbolFontNameBuffer);
-                    return GetSymbolFont_Scalar(ch, Vector<byte>.Count);
+                    if (EarlyOut(Vector<byte>.Count))
+                    {
+                        currentPos += ch == ';' ? Vector<byte>.Count + 1 : Vector<byte>.Count;
+                        return SymbolFont.None;
+                    }
+
+                    currentPos += ch == ';' ? Vector<byte>.Count + 1 : Vector<byte>.Count;
+                    return TryFindSymbolFont(vector, _symbolFontNameVectors);
                 }
                 else
                 {
-                    return SymbolFont.None;
+                    currentPos += Vector<byte>.Count;
+                    if (Vector<byte>.Count < _maxSupportedSymbolFontNameLength)
+                    {
+                        vector.CopyTo(_symbolFontNameBuffer);
+                        return GetSymbolFont_Scalar(ref bufferRef, ch, Vector<byte>.Count);
+                    }
+                    else
+                    {
+                        return SymbolFont.None;
+                    }
                 }
             }
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool EarlyOut(int index, ref int currentPos, char ch)
+        else
         {
-            if (!index.IsBetween(_minSupportedSymbolFontNameLength, _maxSupportedSymbolFontNameLength) ||
-                !_symbolFontNameLengths[index])
-            {
-                currentPos += ch == ';' ? index + 1 : index;
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            return GetSymbolFont_Scalar(ref bufferRef, ch);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static SymbolFont TryFindSymbolFont(Vector<byte> fontName, Vector<byte>[] symbolFontNameVectors, ref int currentPos, char ch, int index)
+        static bool EarlyOut(int index)
+        {
+            return !index.IsBetween(_minSupportedSymbolFontNameLength, _maxSupportedSymbolFontNameLength) ||
+                   !_symbolFontNameLengths[index];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static SymbolFont TryFindSymbolFont(Vector<byte> fontName, Vector<byte>[] symbolFontNameVectors)
         {
             for (int i = _symbolArraysStartingIndex; i < _symbolArraysLength; i++)
             {
                 if (fontName == symbolFontNameVectors[i])
                 {
-                    currentPos += ch == ';' ? index + 1 : index;
                     return (SymbolFont)i;
                 }
             }
 
-            currentPos += ch == ';' ? index + 1 : index;
             return SymbolFont.None;
         }
     }
