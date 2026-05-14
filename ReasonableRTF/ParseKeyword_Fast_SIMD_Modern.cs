@@ -1,7 +1,6 @@
 ﻿#if NET8_0_OR_GREATER
 
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
@@ -21,7 +20,7 @@ public sealed partial class RtfToTextConverter
     If we were smarter about it and parsed all found complete keywords in each vector, would Vector256 be faster
     again?
     */
-    private RtfError ParseKeyword_Fast_Vector128(ref byte bufferRef)
+    private RtfError ParseKeyword_Fast_Vector128(ref byte bufferRef, ref byte keywordRef)
     {
         bool hasParam = false;
         int param = 0;
@@ -113,7 +112,7 @@ public sealed partial class RtfToTextConverter
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0);
+                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
             }
             else
             {
@@ -125,7 +124,7 @@ public sealed partial class RtfToTextConverter
         {
             if (_skipDestinationIfUnknown)
             {
-                SkipDest(ref bufferRef, null, 0);
+                SkipDest(ref bufferRef, ref bufferRef, 0);
             }
             _skipDestinationIfUnknown = false;
             return RtfError.OK;
@@ -133,7 +132,7 @@ public sealed partial class RtfToTextConverter
 
         _skipDestinationIfUnknown = false;
 
-        return DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0);
+        return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
     }
 }
 #endif

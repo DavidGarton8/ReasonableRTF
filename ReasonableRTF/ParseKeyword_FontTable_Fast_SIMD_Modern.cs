@@ -9,7 +9,7 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
-    private RtfError ParseKeyword_FontTable_Fast_Vector128(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
+    private RtfError ParseKeyword_FontTable_Fast_Vector128(ref byte bufferRef, ref byte keywordRef, out KeywordType fontTableKeyword, out int param)
     {
         bool hasParam = false;
         param = 0;
@@ -115,7 +115,7 @@ public sealed partial class RtfToTextConverter
         {
             if (_skipDestinationIfUnknown)
             {
-                SkipDest(ref bufferRef, null, 0);
+                SkipDest(ref bufferRef, ref bufferRef, 0);
             }
             _skipDestinationIfUnknown = false;
             return RtfError.OK;
@@ -125,7 +125,7 @@ public sealed partial class RtfToTextConverter
 
         fontTableKeyword = symbol.KeywordType;
         return fontTableKeyword < KeywordType.F
-            ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0)
+            ? DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0)
             : RtfError.OK;
     }
 }

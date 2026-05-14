@@ -9,7 +9,7 @@ namespace ReasonableRTF;
 public sealed partial class RtfToTextConverter
 {
     // Generated version that doesn't do manual bounds checking, for when we know we're far enough from the end of the buffer
-    private RtfError ParseKeyword_Fast(ref byte bufferRef)
+    private RtfError ParseKeyword_Fast(ref byte bufferRef, ref byte keywordRef)
     {
         bool hasParam = false;
         int param = 0;
@@ -17,8 +17,6 @@ public sealed partial class RtfToTextConverter
 
         // [FenGen:ScalarKeywordParseSection:Fast:Dest:Begin]
         char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
-
-        byte[] keyword = _keyword;
 
         if (!CharExtension.IsAsciiLetter(ch))
         {
@@ -42,7 +40,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, null, 0);
+                    SkipDest(ref bufferRef, ref bufferRef, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -50,7 +48,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
         }
         else
         {
@@ -59,7 +57,7 @@ public sealed partial class RtfToTextConverter
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
                  keywordCount++, ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef))
             {
-                keyword[keywordCount] = (byte)ch;
+                WriteByteAtPos_KeywordLookup(ref keywordRef, keywordCount, (byte)ch);
             }
             if (keywordCount > _keywordMaxLen)
             {
@@ -105,22 +103,22 @@ public sealed partial class RtfToTextConverter
 
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
-            if (keywordCount == 1 && keyword[0] == (byte)'f')
+            if (keywordCount == 1 && keywordRef == (byte)'f')
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, null, 0);
+                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
             }
             else
             {
-                symbol = LookUpControlWord(keyword, keywordCount);
+                symbol = LookUpControlWord(ref keywordRef, keywordCount);
             }
 
             if (symbol == null)
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, null, 0);
+                    SkipDest(ref bufferRef, ref bufferRef, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -128,7 +126,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, keyword, keywordCount);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, keywordCount);
         }
     }
 }

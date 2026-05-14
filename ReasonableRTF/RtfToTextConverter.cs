@@ -2288,8 +2288,10 @@ public sealed partial class RtfToTextConverter
             // Avoid bounds checks by passing a buffer reference everywhere. We do our own bounds checking.
             ReadOnlySpan<byte> bufferSpan = _buffer.AsSpan();
             ref byte bufferRef = ref MemoryMarshal.GetReference(bufferSpan);
+            ReadOnlySpan<byte> keywordSpan = _keyword.AsSpan();
+            ref byte keywordRef = ref MemoryMarshal.GetReference(keywordSpan);
 
-            RtfError error = ParseRtf(ref bufferRef);
+            RtfError error = ParseRtf(ref bufferRef, ref keywordRef);
             if (error == RtfError.OK)
             {
                 return new RtfResult(CreateReturnStringFromChars(_plainText));
@@ -2334,7 +2336,7 @@ public sealed partial class RtfToTextConverter
 
     #region Parse
 
-    private RtfError ParseRtf(ref byte bufferRef)
+    private RtfError ParseRtf(ref byte bufferRef, ref byte keywordRef)
     {
         while (!_reachedEndOfStream)
         {
@@ -2346,7 +2348,7 @@ public sealed partial class RtfToTextConverter
                 switch (ch)
                 {
                     case '\\':
-                        RtfError ec = ParseKeyword(ref bufferRef);
+                        RtfError ec = ParseKeyword(ref bufferRef, ref keywordRef);
                         if (ec != RtfError.OK) return ec;
                         break;
                     case '{':
@@ -2399,51 +2401,51 @@ public sealed partial class RtfToTextConverter
         return _groupStackCount > 0 ? RtfError.UnmatchedBrace : RtfError.OK;
     }
 
-    private RtfError ParseKeyword(ref byte bufferRef)
+    private RtfError ParseKeyword(ref byte bufferRef, ref byte keywordRef)
     {
         if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
         {
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_Fast_Vector128(ref bufferRef);
-                return result == RtfError.KeywordTooLong ? ParseKeyword_Fast(ref bufferRef) : result;
+                RtfError result = ParseKeyword_Fast_Vector128(ref bufferRef, ref keywordRef);
+                return result == RtfError.KeywordTooLong ? ParseKeyword_Fast(ref bufferRef, ref keywordRef) : result;
             }
             else
 #endif
             {
-                return ParseKeyword_Fast(ref bufferRef);
+                return ParseKeyword_Fast(ref bufferRef, ref keywordRef);
             }
         }
         else
         {
-            return ParseKeyword_Slow(ref bufferRef);
+            return ParseKeyword_Slow(ref bufferRef, ref keywordRef);
         }
     }
 
-    private RtfError ParseKeyword_FontTable(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
+    private RtfError ParseKeyword_FontTable(ref byte bufferRef, ref byte keywordRef, out KeywordType fontTableKeyword, out int param)
     {
         if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
         {
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_FontTable_Fast_Vector128(ref bufferRef, out fontTableKeyword, out param);
-                return result == RtfError.KeywordTooLong ? ParseKeyword_FontTable_Fast(ref bufferRef, out fontTableKeyword, out param) : result;
+                RtfError result = ParseKeyword_FontTable_Fast_Vector128(ref bufferRef, ref keywordRef, out fontTableKeyword, out param);
+                return result == RtfError.KeywordTooLong ? ParseKeyword_FontTable_Fast(ref bufferRef, ref keywordRef, out fontTableKeyword, out param) : result;
             }
             else
 #endif
             {
-                return ParseKeyword_FontTable_Fast(ref bufferRef, out fontTableKeyword, out param);
+                return ParseKeyword_FontTable_Fast(ref bufferRef, ref keywordRef, out fontTableKeyword, out param);
             }
         }
         else
         {
-            return ParseKeyword_FontTable_Slow(ref bufferRef, out fontTableKeyword, out param);
+            return ParseKeyword_FontTable_Slow(ref bufferRef, ref keywordRef, out fontTableKeyword, out param);
         }
     }
 
-    private RtfError ParseFontTable(ref byte bufferRef)
+    private RtfError ParseFontTable(ref byte bufferRef, ref byte keywordRef)
     {
         // Prevent stack overflow from maliciously-crafted rtf files - we should never recurse back into here in
         // a spec-conforming file.
@@ -2501,7 +2503,7 @@ public sealed partial class RtfToTextConverter
                         }
                         break;
                     case '\\':
-                        RtfError ec = ParseKeyword_FontTable(ref bufferRef, out KeywordType fontTableKeyword, out int param);
+                        RtfError ec = ParseKeyword_FontTable(ref bufferRef, ref keywordRef, out KeywordType fontTableKeyword, out int param);
                         if (ec != RtfError.OK) return ec;
 
                         if (fontTableKeyword == KeywordType.F)
@@ -2761,7 +2763,7 @@ public sealed partial class RtfToTextConverter
     #region Act on keywords
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private RtfError DispatchKeyword(ref byte bufferRef, Symbol symbol, int param, bool hasParam, byte[]? keyword, int keywordLength)
+    private RtfError DispatchKeyword(ref byte bufferRef, ref byte keywordRef, Symbol symbol, int param, bool hasParam, int keywordLength)
     {
         if (!GroupStack_CurrentSkipDest)
         {
@@ -2776,19 +2778,19 @@ public sealed partial class RtfToTextConverter
                     return RtfError.OK;
                 case KeywordType.Special:
                     SpecialType specialType = (SpecialType)symbol.Index;
-                    return DispatchSpecialKeyword(ref bufferRef, specialType, symbol, param);
+                    return DispatchSpecialKeyword(ref bufferRef, ref keywordRef, specialType, symbol, param);
                 case KeywordType.Destination:
                     DestinationType destType = (DestinationType)symbol.Index;
                     if (destType == DestinationType.SkippableHex)
                     {
-                        return HandleSkippableHexData(ref bufferRef, param);
+                        return HandleSkippableHexData(ref bufferRef, ref keywordRef, param);
                     }
                     else
                     {
                         switch (destType)
                         {
                             case DestinationType.Skip:
-                                SkipDest(ref bufferRef, keyword, keywordLength);
+                                SkipDest(ref bufferRef, ref keywordRef, keywordLength);
                                 return RtfError.OK;
                             case DestinationType.FieldInstruction:
                                 return HandleFieldInstruction(ref bufferRef);
@@ -2808,12 +2810,12 @@ public sealed partial class RtfToTextConverter
             {
                 case KeywordType.Destination:
                     return symbol.Index == (int)DestinationType.SkippableHex
-                        ? HandleSkippableHexData(ref bufferRef, param)
+                        ? HandleSkippableHexData(ref bufferRef, ref keywordRef, param)
                         : RtfError.OK;
                 case KeywordType.Special:
                     SpecialType specialType = (SpecialType)symbol.Index;
                     return specialType == SpecialType.SkipNumberOfBytes
-                        ? DispatchSpecialKeyword(ref bufferRef, specialType, symbol, param)
+                        ? DispatchSpecialKeyword(ref bufferRef, ref keywordRef, specialType, symbol, param)
                         : RtfError.OK;
                 default:
                     return RtfError.OK;
@@ -2821,7 +2823,7 @@ public sealed partial class RtfToTextConverter
         }
     }
 
-    private RtfError DispatchSpecialKeyword(ref byte bufferRef, SpecialType specialType, Symbol symbol, int param)
+    private RtfError DispatchSpecialKeyword(ref byte bufferRef, ref byte keywordRef, SpecialType specialType, Symbol symbol, int param)
     {
         switch (specialType)
         {
@@ -2852,7 +2854,7 @@ public sealed partial class RtfToTextConverter
                 break;
             case SpecialType.FontTable:
             {
-                RtfError error = ParseFontTable(ref bufferRef);
+                RtfError error = ParseFontTable(ref bufferRef, ref keywordRef);
                 if (error != RtfError.OK) return error;
                 break;
             }
@@ -3634,7 +3636,7 @@ public sealed partial class RtfToTextConverter
     {
         if (GroupStack_CurrentPropertyHidden != 0)
         {
-            SkipDest(ref bufferRef, null, 0);
+            SkipDest(ref bufferRef, ref bufferRef, 0);
             return RtfError.OK;
         }
 
@@ -3652,7 +3654,7 @@ public sealed partial class RtfToTextConverter
 
             if ((SYMBOLKeyword & _SYMBOLKeywordAsULong_Mask) != _SYMBOLKeywordAsULong)
             {
-                SkipDest(ref bufferRef, null, 0);
+                SkipDest(ref bufferRef, ref bufferRef, 0);
                 return RtfError.OK;
             }
             _currentPos += _SYMBOLName.Length;
@@ -3899,7 +3901,7 @@ public sealed partial class RtfToTextConverter
     private RtfError RewindAndSkipGroup(ref byte bufferRef)
     {
         _currentPos--;
-        SkipDest(ref bufferRef, null, 0);
+        SkipDest(ref bufferRef, ref bufferRef, 0);
         return RtfError.OK;
     }
 
@@ -4420,7 +4422,7 @@ public sealed partial class RtfToTextConverter
         return _currentBufferChunkLength;
     }
 
-    private RtfError HandleSkippableHexData(ref byte bufferRef, int param)
+    private RtfError HandleSkippableHexData(ref byte bufferRef, ref byte keywordRef, int param)
     {
         bool insertSpaceIfNecessary = param == 1;
 
@@ -4459,7 +4461,7 @@ public sealed partial class RtfToTextConverter
                         break;
                     case '\\':
                         // This implicitly also handles the case where the data is \binN instead of hex
-                        RtfError ec = ParseKeyword(ref bufferRef);
+                        RtfError ec = ParseKeyword(ref bufferRef, ref keywordRef);
                         if (ec != RtfError.OK) return ec;
                         break;
                     case '\r':
@@ -4487,7 +4489,14 @@ public sealed partial class RtfToTextConverter
         return RtfError.OK;
     }
 
-    private void SkipDest(ref byte bufferRef, byte[]? keyword, int keywordLength)
+    /// <summary>
+    /// To signify that there is no <paramref name="keywordRef"></paramref>, just pass <paramref name="bufferRef"></paramref>
+    /// again in its place and pass 0 for <paramref name="keywordLength"></paramref>.
+    /// </summary>
+    /// <param name="bufferRef"></param>
+    /// <param name="keywordRef"></param>
+    /// <param name="keywordLength"></param>
+    private void SkipDest(ref byte bufferRef, ref byte keywordRef, int keywordLength)
     {
         // This method should either skip the entire destination in one go, or else bail and use the slow path
         // for the rest of the destination.
@@ -4571,7 +4580,7 @@ public sealed partial class RtfToTextConverter
             minimize perf loss when we don't.
             */
 
-            if (keyword != null && keywordLength >= 4 && FoundSkipDataKeyword(keyword, 0))
+            if (keywordLength >= 4 && FoundSkipDataKeyword(ref keywordRef, 0))
             {
                 return;
             }
@@ -4622,28 +4631,6 @@ public sealed partial class RtfToTextConverter
     // After testing a number of different methods of keyword detection, this came out the fastest. There are
     // only six letters our keywords can start with, so any other letter will be rejected with a single array
     // access and a null check.
-
-    private static bool FoundSkipDataKeyword(byte[] buffer, int index)
-    {
-        // After testing a number of different methods of keyword detection, this came out the fastest. There are
-        // only six letters our keywords can start with, so any other letter will be rejected with a single array
-        // access and a null check.
-
-        SkipDataKeywords? keyword = _skipDataKeywords[buffer[index]];
-        if (keyword != null)
-        {
-            uint value = Unsafe.ReadUnaligned<uint>(ref buffer[index]);
-            if (((value & keyword.Id) != 0) ||
-                (keyword.UseExtra &&
-                 (((value & keyword.Id2) != 0) || ((value & keyword.Id3) != 0))))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private bool FoundSkipDataKeyword(ref byte bufferRef, int index)
     {
         SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos(ref bufferRef, index)];
@@ -5365,7 +5352,7 @@ public sealed partial class RtfToTextConverter
     private static Symbol? LookUpControlSymbol(byte ch) => _controlSymbols[ch];
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Symbol? LookUpControlWord(byte[] keyword, byte len)
+    private static Symbol? LookUpControlWord(ref byte keywordRef, byte len)
     {
         // Min word length is 1, and we're guaranteed to always be at least 1, so no need to check for >= min
         if (len <= MAX_WORD_LENGTH)
@@ -5375,20 +5362,19 @@ public sealed partial class RtfToTextConverter
             // Original C code does a stupid thing where it puts default at the top and falls through and junk,
             // but we can't do that in C#, so have something clearer/clunkier
             // NOTE: This logic is optimized to do the same thing as the gperf generated code, but more efficiently.
-            key += asso_values[keyword[len - 1]];
+            key += asso_values[GetByteAtPos_KeywordLookup(ref keywordRef, len - 1)];
             switch (len)
             {
                 // Most common case first - we get a measurable speedup from this
                 case > 2:
-                    key += asso_values[keyword[2]];
-                    key += asso_values[keyword[1]];
+                    key += asso_values[GetByteAtPos_KeywordLookup(ref keywordRef, 2)];
+                    key += asso_values[GetByteAtPos_KeywordLookup(ref keywordRef, 1)];
                     break;
                 case 2:
-                    key += asso_values[keyword[1]];
+                    key += asso_values[GetByteAtPos_KeywordLookup(ref keywordRef, 1)];
                     break;
             }
-            byte first = keyword[0];
-            key += asso_values[first];
+            key += asso_values[keywordRef];
 
             if (key <= MAX_HASH_VALUE)
             {
@@ -5403,7 +5389,7 @@ public sealed partial class RtfToTextConverter
                     return null;
                 }
 
-                if (first != symbol.KeywordFirstChar)
+                if (keywordRef != symbol.KeywordFirstChar)
                 {
                     return null;
                 }
@@ -5411,7 +5397,7 @@ public sealed partial class RtfToTextConverter
                 string symbolKeyword = symbol.Keyword;
                 for (byte ci = 1; ci < len; ci++)
                 {
-                    if (keyword[ci] != symbolKeyword[ci])
+                    if (GetByteAtPos_KeywordLookup(ref keywordRef, ci) != symbolKeyword[ci])
                     {
                         return null;
                     }
@@ -5471,6 +5457,18 @@ public sealed partial class RtfToTextConverter
         return null;
     }
 #endif
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static byte GetByteAtPos_KeywordLookup(ref byte keywordRef, int pos)
+    {
+        return Unsafe.ReadUnaligned<byte>(ref Unsafe.AddByteOffset(ref keywordRef, (nint)pos));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void WriteByteAtPos_KeywordLookup(ref byte keywordRef, int pos, byte b)
+    {
+        Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref keywordRef, (nint)pos), b);
+    }
 
     #endregion
 
