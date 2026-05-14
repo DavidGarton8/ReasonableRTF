@@ -2280,18 +2280,7 @@ public sealed partial class RtfToTextConverter
                 return new RtfResult(RtfError.NotAnRtfFile, 0, null);
             }
 
-            /*
-            TODO: On Framework x86, we're slower than before we added the bufferRef stuff. But if we disable the
-            bufferRef stuff for x86, we're even slower still.
-            */
-
-            // Avoid bounds checks by passing a buffer reference everywhere. We do our own bounds checking.
-            ReadOnlySpan<byte> bufferSpan = _buffer.AsSpan();
-            ref byte bufferRef = ref MemoryMarshal.GetReference(bufferSpan);
-            ReadOnlySpan<byte> keywordSpan = _keyword.AsSpan();
-            ref byte keywordRef = ref MemoryMarshal.GetReference(keywordSpan);
-
-            RtfError error = ParseRtf(ref bufferRef, ref keywordRef);
+            RtfError error = ParseRtf();
             if (error == RtfError.OK)
             {
                 return new RtfResult(CreateReturnStringFromChars(_plainText));
@@ -2336,8 +2325,18 @@ public sealed partial class RtfToTextConverter
 
     #region Parse
 
-    private RtfError ParseRtf(ref byte bufferRef, ref byte keywordRef)
+    private RtfError ParseRtf()
     {
+        /*
+        TODO: On Framework x86, we're slower than before we added the bufferRef stuff. But if we disable the
+        bufferRef stuff for x86, we're even slower still.
+        */
+        // Avoid bounds checks by passing a buffer reference everywhere. We do our own bounds checking.
+        ReadOnlySpan<byte> bufferSpan = _buffer.AsSpan();
+        ref byte bufferRef = ref MemoryMarshal.GetReference(bufferSpan);
+        ReadOnlySpan<byte> keywordSpan = _keyword.AsSpan();
+        ref byte keywordRef = ref MemoryMarshal.GetReference(keywordSpan);
+
         while (!_reachedEndOfStream)
         {
             while (_currentPos < _currentBufferChunkLength)
@@ -2401,6 +2400,7 @@ public sealed partial class RtfToTextConverter
         return _groupStackCount > 0 ? RtfError.UnmatchedBrace : RtfError.OK;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private RtfError ParseKeyword(ref byte bufferRef, ref byte keywordRef)
     {
         if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
@@ -2408,7 +2408,7 @@ public sealed partial class RtfToTextConverter
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_Fast_Vector128(ref bufferRef, ref keywordRef);
+                RtfError result = ParseKeyword_Fast_Vector128(ref bufferRef);
                 return result == RtfError.KeywordTooLong ? ParseKeyword_Fast(ref bufferRef, ref keywordRef) : result;
             }
             else
@@ -2423,6 +2423,7 @@ public sealed partial class RtfToTextConverter
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private RtfError ParseKeyword_FontTable(ref byte bufferRef, ref byte keywordRef, out KeywordType fontTableKeyword, out int param)
     {
         if (_currentPos < _currentBufferChunkLength - _keywordParseMaxRequiredBytes)
@@ -2430,7 +2431,7 @@ public sealed partial class RtfToTextConverter
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_FontTable_Fast_Vector128(ref bufferRef, ref keywordRef, out fontTableKeyword, out param);
+                RtfError result = ParseKeyword_FontTable_Fast_Vector128(ref bufferRef, out fontTableKeyword, out param);
                 return result == RtfError.KeywordTooLong ? ParseKeyword_FontTable_Fast(ref bufferRef, ref keywordRef, out fontTableKeyword, out param) : result;
             }
             else

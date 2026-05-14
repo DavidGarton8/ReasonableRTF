@@ -20,7 +20,7 @@ public sealed partial class RtfToTextConverter
     If we were smarter about it and parsed all found complete keywords in each vector, would Vector256 be faster
     again?
     */
-    private RtfError ParseKeyword_Fast_Vector128(ref byte bufferRef, ref byte keywordRef)
+    private RtfError ParseKeyword_Fast_Vector128(ref byte bufferRef)
     {
         bool hasParam = false;
         int param = 0;
@@ -112,7 +112,7 @@ public sealed partial class RtfToTextConverter
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
+                return DispatchKeyword(ref bufferRef, ref bufferRef, symbol, param, hasParam, 0);
             }
             else
             {
@@ -132,7 +132,7 @@ public sealed partial class RtfToTextConverter
 
         _skipDestinationIfUnknown = false;
 
-        return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
+        return DispatchKeyword(ref bufferRef, ref bufferRef, symbol, param, hasParam, 0);
     }
 }
 #endif
