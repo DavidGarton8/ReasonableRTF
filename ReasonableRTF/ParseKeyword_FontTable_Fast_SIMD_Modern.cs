@@ -51,7 +51,7 @@ public sealed partial class RtfToTextConverter
             if (keywordCount >= Vector128<byte>.Count)
             {
                 _currentPos = startingCurrentPos;
-                return RtfError.KeywordTooLong;
+                return ParseKeyword_Fast(ref bufferRef);
             }
 
             Vector128<byte> maskVec = Vector128.GreaterThan(Vector128.Create(keywordCount), _indexVec_128);

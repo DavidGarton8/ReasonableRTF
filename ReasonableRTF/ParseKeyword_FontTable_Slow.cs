@@ -57,7 +57,7 @@ public sealed partial class RtfToTextConverter
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
                  keywordCount++, ch = (char)GetByte(IncrementCurrentPos()))
             {
-                WriteByteAtPos_KeywordLookup(_keywordMem, keywordCount, (byte)ch);
+                WriteByteAtPos_KeywordLookup(keywordCount, (byte)ch);
             }
             if (keywordCount > _keywordMaxLen)
             {
@@ -112,7 +112,7 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                symbol = LookUpControlWord(_keywordMem, keywordCount);
+                symbol = LookUpControlWord(keywordCount);
             }
 
             if (symbol == null)

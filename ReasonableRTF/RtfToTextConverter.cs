@@ -2411,8 +2411,7 @@ public sealed partial class RtfToTextConverter
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_Fast_Vector128(ref bufferRef);
-                return result == RtfError.KeywordTooLong ? ParseKeyword_Fast(ref bufferRef) : result;
+                return ParseKeyword_Fast_Vector128(ref bufferRef);
             }
             else
 #endif
@@ -2434,8 +2433,7 @@ public sealed partial class RtfToTextConverter
 #if NET8_0_OR_GREATER
             if (System.Runtime.Intrinsics.Vector128.IsHardwareAccelerated)
             {
-                RtfError result = ParseKeyword_FontTable_Fast_Vector128(ref bufferRef, out fontTableKeyword, out param);
-                return result == RtfError.KeywordTooLong ? ParseKeyword_FontTable_Fast(ref bufferRef, out fontTableKeyword, out param) : result;
+                return ParseKeyword_FontTable_Fast_Vector128(ref bufferRef, out fontTableKeyword, out param);
             }
             else
 #endif
@@ -4577,7 +4575,7 @@ public sealed partial class RtfToTextConverter
             minimize perf loss when we don't.
             */
 
-            if (keywordLength >= 4 && FoundSkipDataKeyword(_keywordMem, 0))
+            if (keywordLength >= 4 && FoundSkipDataKeywordAtStartOfKeywordBuffer())
             {
                 return;
             }
@@ -4645,12 +4643,12 @@ public sealed partial class RtfToTextConverter
         return false;
     }
 
-    private static unsafe bool FoundSkipDataKeyword(nint keywordMem, int index)
+    private unsafe bool FoundSkipDataKeywordAtStartOfKeywordBuffer()
     {
-        SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos_KeywordLookup(keywordMem, index)];
+        SkipDataKeywords? keyword = _skipDataKeywords[*(byte*)_keywordMem];
         if (keyword != null)
         {
-            uint value = *(uint*)keywordMem;
+            uint value = *(uint*)_keywordMem;
             if (((value & keyword.Id) != 0) ||
                 (keyword.UseExtra &&
                  (((value & keyword.Id2) != 0) || ((value & keyword.Id3) != 0))))
@@ -5366,7 +5364,7 @@ public sealed partial class RtfToTextConverter
     private static Symbol? LookUpControlSymbol(byte ch) => _controlSymbols[ch];
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe Symbol? LookUpControlWord(nint keywordMem, byte len)
+    private unsafe Symbol? LookUpControlWord(byte len)
     {
         // Min word length is 1, and we're guaranteed to always be at least 1, so no need to check for >= min
         if (len <= MAX_WORD_LENGTH)
@@ -5376,19 +5374,19 @@ public sealed partial class RtfToTextConverter
             // Original C code does a stupid thing where it puts default at the top and falls through and junk,
             // but we can't do that in C#, so have something clearer/clunkier
             // NOTE: This logic is optimized to do the same thing as the gperf generated code, but more efficiently.
-            key += asso_values[GetByteAtPos_KeywordLookup(keywordMem, len - 1)];
+            key += asso_values[GetByteAtPos_KeywordLookup(len - 1)];
             switch (len)
             {
                 // Most common case first - we get a measurable speedup from this
                 case > 2:
-                    key += asso_values[GetByteAtPos_KeywordLookup(keywordMem, 2)];
-                    key += asso_values[GetByteAtPos_KeywordLookup(keywordMem, 1)];
+                    key += asso_values[GetByteAtPos_KeywordLookup(2)];
+                    key += asso_values[GetByteAtPos_KeywordLookup(1)];
                     break;
                 case 2:
-                    key += asso_values[GetByteAtPos_KeywordLookup(keywordMem, 1)];
+                    key += asso_values[GetByteAtPos_KeywordLookup(1)];
                     break;
             }
-            byte first = *(byte*)keywordMem;
+            byte first = *(byte*)_keywordMem;
             key += asso_values[first];
 
             if (key <= MAX_HASH_VALUE)
@@ -5412,7 +5410,7 @@ public sealed partial class RtfToTextConverter
                 string symbolKeyword = symbol.Keyword;
                 for (byte ci = 1; ci < len; ci++)
                 {
-                    if (GetByteAtPos_KeywordLookup(keywordMem, ci) != symbolKeyword[ci])
+                    if (GetByteAtPos_KeywordLookup(ci) != symbolKeyword[ci])
                     {
                         return null;
                     }
@@ -5474,15 +5472,15 @@ public sealed partial class RtfToTextConverter
 #endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe byte GetByteAtPos_KeywordLookup(nint keywordMem, int pos)
+    private unsafe byte GetByteAtPos_KeywordLookup(int pos)
     {
-        return *(byte*)(keywordMem + pos);
+        return *(byte*)(_keywordMem + pos);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void WriteByteAtPos_KeywordLookup(nint keywordMem, int pos, byte b)
+    private unsafe void WriteByteAtPos_KeywordLookup(int pos, byte b)
     {
-        *(byte*)(keywordMem + pos) = b;
+        *(byte*)(_keywordMem + pos) = b;
     }
 
     #endregion
