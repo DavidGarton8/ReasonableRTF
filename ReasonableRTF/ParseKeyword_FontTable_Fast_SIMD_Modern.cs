@@ -115,7 +115,7 @@ public sealed partial class RtfToTextConverter
         {
             if (_skipDestinationIfUnknown)
             {
-                SkipDest(ref bufferRef, ref bufferRef, 0);
+                SkipDest(ref bufferRef, 0);
             }
             _skipDestinationIfUnknown = false;
             return RtfError.OK;
@@ -125,7 +125,7 @@ public sealed partial class RtfToTextConverter
 
         fontTableKeyword = symbol.KeywordType;
         return fontTableKeyword < KeywordType.F
-            ? DispatchKeyword(ref bufferRef, ref bufferRef, symbol, param, hasParam, 0)
+            ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0)
             : RtfError.OK;
     }
 }

@@ -9,7 +9,7 @@ namespace ReasonableRTF;
 public sealed partial class RtfToTextConverter
 {
     [GenAttributes.FenGen_ParseKeyword(nameof(GetByte), nameof(GetByteAtCurrentPosAndIncrement), nameof(IncrementCurrentPos), nameof(bufferRef))]
-    private RtfError ParseKeyword_Slow(ref byte bufferRef, ref byte keywordRef)
+    private unsafe RtfError ParseKeyword_Slow(ref byte bufferRef)
     {
         bool hasParam = false;
         int param = 0;
@@ -40,7 +40,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref bufferRef, 0);
+                    SkipDest(ref bufferRef, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -48,7 +48,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
         }
         else
         {
@@ -57,7 +57,7 @@ public sealed partial class RtfToTextConverter
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
                  keywordCount++, ch = (char)GetByte(IncrementCurrentPos()))
             {
-                WriteByteAtPos_KeywordLookup(ref keywordRef, keywordCount, (byte)ch);
+                WriteByteAtPos_KeywordLookup(_keywordMem, keywordCount, (byte)ch);
             }
             if (keywordCount > _keywordMaxLen)
             {
@@ -103,22 +103,22 @@ public sealed partial class RtfToTextConverter
 
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
-            if (keywordCount == 1 && keywordRef == (byte)'f')
+            if (keywordCount == 1 && *(byte*)_keywordMem == (byte)'f')
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
+                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
             }
             else
             {
-                symbol = LookUpControlWord(ref keywordRef, keywordCount);
+                symbol = LookUpControlWord(_keywordMem, keywordCount);
             }
 
             if (symbol == null)
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref bufferRef, 0);
+                    SkipDest(ref bufferRef, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -126,7 +126,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, keywordCount);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, keywordCount);
         }
     }
 }
