@@ -40,7 +40,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref GetKeywordMemRef(), 0);
+                    SkipDest(ref bufferRef, ref bufferRef, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -48,7 +48,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, ref GetKeywordMemRef(), symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, ref bufferRef, symbol, param, hasParam, 0);
         }
         else
         {
@@ -57,6 +57,7 @@ public sealed partial class RtfToTextConverter
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
                  keywordCount++, ch = (char)GetByte(IncrementCurrentPos()))
             {
+                // [FenGen:RemoveLine]
                 WriteByteAtPos_KeywordLookup(keywordCount, (byte)ch);
             }
             if (keywordCount > _keywordMaxLen)
@@ -105,24 +106,26 @@ public sealed partial class RtfToTextConverter
             if (ch != ' ') --_currentPos;
             // [FenGen:ScalarKeywordParseSection:Source:End]
 
+            ref byte keywordRef = ref GetKeywordMemRef();
+
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
-            if (keywordCount == 1 && *(byte*)_keywordMem == (byte)'f')
+            if (keywordCount == 1 && keywordRef == (byte)'f')
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, ref GetKeywordMemRef(), symbol, param, hasParam, 0);
+                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
             }
             else
             {
-                symbol = LookUpControlWord(ref GetKeywordMemRef(), keywordCount);
+                symbol = LookUpControlWord(ref keywordRef, keywordCount);
             }
 
             if (symbol == null)
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref GetKeywordMemRef(), 0);
+                    SkipDest(ref bufferRef, ref keywordRef, 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -130,7 +133,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, ref GetKeywordMemRef(), symbol, param, hasParam, keywordCount);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, keywordCount);
         }
     }
 }

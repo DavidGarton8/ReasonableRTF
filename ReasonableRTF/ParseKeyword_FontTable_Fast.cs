@@ -137,7 +137,7 @@ public sealed partial class RtfToTextConverter
 
             fontTableKeyword = symbol.KeywordType;
             return fontTableKeyword < KeywordType.F
-                ? DispatchKeyword(ref bufferRef, ref bufferRef, symbol, param, hasParam, keywordCount)
+                ? DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, keywordCount)
                 : RtfError.OK;
         }
     }

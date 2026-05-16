@@ -42,6 +42,7 @@ internal static class ParseKeywordGen
         TextLineCollection methodLines = method.GetText().Lines;
         List<string> sourceLines = new();
         bool inSourceLinesSection = false;
+        bool removeNextLine = false;
         for (int i = 0; i < methodLines.Count; i++)
         {
             TextLine line = methodLines[i];
@@ -55,6 +56,18 @@ internal static class ParseKeywordGen
                 }
                 else
                 {
+                    if (removeNextLine)
+                    {
+                        removeNextLine = false;
+                        continue;
+                    }
+
+                    if (IsFenGenNotationLine(lineStr, "[FenGen:RemoveLine]"))
+                    {
+                        removeNextLine = true;
+                        continue;
+                    }
+
                     sourceLines.Add(lineStr);
                 }
             }
