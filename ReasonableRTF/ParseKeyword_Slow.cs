@@ -94,11 +94,15 @@ public sealed partial class RtfToTextConverter
                         return RtfError.ParameterOutOfRange;
                     }
                 }
+                /*
+                NOTE: Turns out the branches are actually faster than the branchless black magic. On all targets.
+                Go figure...
+                */
                 // This negate is safe, because int max negated is -2147483647, and int min is -2147483648
-                param = BranchlessConditionalNegate(param, negateParam);
+                if (negateParam == 1) param = -param;
             }
 
-            _currentPos += MinusOneIfNotSpace_8Bits(ch);
+            if (ch != ' ') --_currentPos;
             // [FenGen:ScalarKeywordParseSection:Source:End]
 
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial

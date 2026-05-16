@@ -3169,20 +3169,20 @@ public sealed partial class RtfToTextConverter
                                 return RtfError.ParameterOutOfRange;
                             }
                         }
-                        param = BranchlessConditionalNegate(param, negateParam);
+                        if (negateParam == 1) param = -param;
 
                         /*
                         From the spec:
                         "As with all RTF keywords, a keyword-terminating space may be present (before the ANSI
                         characters) that is not counted in the characters to skip."
                         */
-                        _currentPos += MinusOneIfNotSpace_8Bits(ch);
+                        if (ch != ' ') --_currentPos;
                         HandleUnicodeParamAndSkipFallbackChars(ref bufferRef, param);
                     }
                     else
                     {
                         _currentPos -= (3 + negateParam);
-                        _currentPos += MinusOneIfNotSpace_8Bits(ch);
+                        if (ch != ' ') --_currentPos;
                         ParseUnicode();
                         return RtfError.OK;
                     }
@@ -3244,20 +3244,20 @@ public sealed partial class RtfToTextConverter
                                 return RtfError.ParameterOutOfRange;
                             }
                         }
-                        param = BranchlessConditionalNegate(param, negateParam);
+                        if (negateParam == 1) param = -param;
 
                         /*
                         From the spec:
                         "As with all RTF keywords, a keyword-terminating space may be present (before the ANSI
                         characters) that is not counted in the characters to skip."
                         */
-                        _currentPos += MinusOneIfNotSpace_8Bits(ch);
+                        if (ch != ' ') --_currentPos;
                         HandleUnicodeParamAndSkipFallbackChars(ref bufferRef, param);
                     }
                     else
                     {
                         _currentPos -= (3 + negateParam);
-                        _currentPos += MinusOneIfNotSpace_8Bits(ch);
+                        if (ch != ' ') --_currentPos;
                         ParseUnicode();
                         return RtfError.OK;
                     }
@@ -4366,26 +4366,6 @@ public sealed partial class RtfToTextConverter
         list.ItemsArray[0] = _unicodeUnknown_Char;
         list.Count = 1;
     }
-
-    /// <summary>
-    /// Specialized thing for branchless handling of optional spaces after rtf control words.
-    /// Char values must be no higher than a byte (0-255) for the logic to work (perf).
-    /// </summary>
-    /// <param name="character"></param>
-    /// <returns>-1 if <paramref name="character"/> is not equal to the ascii space character (0x20), otherwise, 0.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int MinusOneIfNotSpace_8Bits(char character)
-    {
-        // We only use 8 bits of a char's 16
-        const int bits = 8;
-        // 7 instructions on Framework x86
-        // 8 instructions on Framework x64
-        // 7 instructions on .NET 8 x64
-        return ((character - ' ') | (' ' - character)) >> (bits - 1);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int BranchlessConditionalNegate(int value, int negate) => (value ^ -negate) + negate;
 
     // Calculate it at the end from values we already have, rather than changing an additional value in hot loops
     private int GetCurrentOverallPos()
