@@ -11,6 +11,18 @@ namespace FenGen;
 
 internal static class ParseKeywordGen
 {
+    private sealed class SourceLine
+    {
+        internal readonly string Line;
+        internal readonly bool RemoveForFastVersion;
+
+        public SourceLine(string line, bool removeForFastVersion)
+        {
+            Line = line;
+            RemoveForFastVersion = removeForFastVersion;
+        }
+    }
+
     internal static void Generate(string sourceFile, List<string> destFiles)
     {
         SyntaxNode[] nodes = GetNodes(sourceFile);
@@ -40,7 +52,7 @@ internal static class ParseKeywordGen
         }
 
         TextLineCollection methodLines = method.GetText().Lines;
-        List<string> sourceLines = new();
+        List<SourceLine> sourceLines = new();
         bool inSourceLinesSection = false;
         bool removeNextLine = false;
         for (int i = 0; i < methodLines.Count; i++)
@@ -59,16 +71,19 @@ internal static class ParseKeywordGen
                     if (removeNextLine)
                     {
                         removeNextLine = false;
+                        sourceLines.Add(new SourceLine(lineStr, true));
                         continue;
                     }
 
-                    if (IsFenGenNotationLine(lineStr, "[FenGen:RemoveLine]"))
+                    if (IsFenGenNotationLine(lineStr, "[FenGen:Fast:RemoveLine]"))
                     {
+                        // This line should always be removed because it's markup, so just don't add it in the
+                        // first place.
                         removeNextLine = true;
                         continue;
                     }
 
-                    sourceLines.Add(lineStr);
+                    sourceLines.Add(new SourceLine(lineStr, false));
                 }
             }
             else if (IsFenGenNotationLine(lineStr, "[FenGen:ScalarKeywordParseSection:Source:Begin]"))
@@ -98,7 +113,7 @@ internal static class ParseKeywordGen
     }
 
     private static void CopyLines(
-        List<string> sourceLines,
+        List<SourceLine> sourceLines,
         List<string> destLines,
         string destFile,
         int i,
@@ -115,15 +130,21 @@ internal static class ParseKeywordGen
             {
                 for (int copyI = sourceLines.Count - 1; copyI >= 0; copyI--)
                 {
-                    string sourceLine = sourceLines[copyI];
+                    SourceLine? sourceLine = sourceLines[copyI];
+                    string line = sourceLine.Line;
                     if (version == "Fast")
                     {
-                        sourceLine = sourceLine.Replace(
+                        if (sourceLine.RemoveForFastVersion)
+                        {
+                            continue;
+                        }
+
+                        line = line.Replace(
                             getByteFunctionName + "(" + incrementFunctionName + "())",
                             bufferRefIncrementFunctionName + "(ref " + bufferRefName + ")"
                         );
                     }
-                    destLines.Insert(subI, sourceLine);
+                    destLines.Insert(subI, line);
                 }
 
                 File.WriteAllLines(destFile, destLines);

@@ -57,6 +57,7 @@ public sealed partial class RtfToTextConverter
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
                  keywordCount++, ch = (char)GetByte(IncrementCurrentPos()))
             {
+                // [FenGen:Fast:RemoveLine]
                 WriteByteAtPos_KeywordLookup(keywordCount, (byte)ch);
             }
             if (keywordCount > _keywordMaxLen)
