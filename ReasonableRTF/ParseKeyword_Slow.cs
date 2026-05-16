@@ -40,7 +40,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref bufferRef, 0);
+                    SkipDest(ref bufferRef);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -48,7 +48,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, ref bufferRef, symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
         }
         else
         {
@@ -114,7 +114,7 @@ public sealed partial class RtfToTextConverter
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, 0);
+                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
             }
             else
             {
@@ -125,7 +125,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref keywordRef, 0);
+                    SkipDest(ref bufferRef);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -133,7 +133,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, keywordCount);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, keywordCount);
         }
     }
 }

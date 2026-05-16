@@ -43,7 +43,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref bufferRef, 0);
+                    SkipDest(ref bufferRef);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -51,7 +51,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, ref bufferRef, symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
         }
         else
         {
@@ -107,7 +107,7 @@ public sealed partial class RtfToTextConverter
             if (ch != ' ') --_currentPos;
             // [FenGen:ScalarKeywordParseSection:Fast:Dest:End]
 
-            ref byte keywordRef = ref Unsafe.AddByteOffset(ref bufferRef, (nint)startingCurrentPos);
+            ref byte keywordRef = ref GetRefAtPos(ref bufferRef, startingCurrentPos);
 
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
@@ -127,7 +127,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, ref keywordRef, 0);
+                    SkipDest(ref bufferRef);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -137,7 +137,7 @@ public sealed partial class RtfToTextConverter
 
             fontTableKeyword = symbol.KeywordType;
             return fontTableKeyword < KeywordType.F
-                ? DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam, keywordCount)
+                ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, keywordCount)
                 : RtfError.OK;
         }
     }

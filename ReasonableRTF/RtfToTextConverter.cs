@@ -2768,7 +2768,7 @@ public sealed partial class RtfToTextConverter
     #region Act on keywords
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private RtfError DispatchKeyword(ref byte bufferRef, ref byte keywordRef, Symbol symbol, int param, bool hasParam, int keywordLength)
+    private RtfError DispatchKeyword(ref byte bufferRef, Symbol symbol, int param, bool hasParam, int keywordLength)
     {
         if (!GroupStack_CurrentSkipDest)
         {
@@ -2795,10 +2795,10 @@ public sealed partial class RtfToTextConverter
                         switch (destType)
                         {
                             case DestinationType.Skip:
-                                SkipDest(ref bufferRef, ref keywordRef, keywordLength);
+                                SkipDest(ref bufferRef);
                                 return RtfError.OK;
                             case DestinationType.FieldInstruction:
-                                return HandleFieldInstruction(ref bufferRef, ref keywordRef);
+                                return HandleFieldInstruction(ref bufferRef);
                             // Stupid crazy type of control word, see description for enum field
                             case DestinationType.CanBeDestOrNotDest:
                             default:
@@ -3637,11 +3637,11 @@ public sealed partial class RtfToTextConverter
     -Supports 0xF000-0xF0FF stuff (but maybe by accident of weird multi-byte behavior?)
      We should probably just say it doesn't support it because it doesn't make sense for Unicode.
     */
-    private RtfError HandleFieldInstruction(ref byte bufferRef, ref byte keywordRef)
+    private RtfError HandleFieldInstruction(ref byte bufferRef)
     {
         if (GroupStack_CurrentPropertyHidden != 0)
         {
-            SkipDest(ref bufferRef, ref keywordRef, 0);
+            SkipDest(ref bufferRef);
             return RtfError.OK;
         }
 
@@ -3659,7 +3659,7 @@ public sealed partial class RtfToTextConverter
 
             if ((SYMBOLKeyword & _SYMBOLKeywordAsULong_Mask) != _SYMBOLKeywordAsULong)
             {
-                SkipDest(ref bufferRef, ref keywordRef, 0);
+                SkipDest(ref bufferRef);
                 return RtfError.OK;
             }
             _currentPos += _SYMBOLName.Length;
@@ -3671,7 +3671,7 @@ public sealed partial class RtfToTextConverter
                 byte b = GetByte(IncrementCurrentPos());
                 if (b != _SYMBOLName[i])
                 {
-                    return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                    return RewindAndSkipGroup(ref bufferRef);
                 }
             }
         }
@@ -3686,7 +3686,7 @@ public sealed partial class RtfToTextConverter
 
         if (ch == '-')
         {
-            return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+            return RewindAndSkipGroup(ref bufferRef);
         }
 
         #region Handle if the param is hex
@@ -3699,7 +3699,7 @@ public sealed partial class RtfToTextConverter
                 ch = (char)GetByte(IncrementCurrentPos());
                 if (ch == '-')
                 {
-                    return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                    return RewindAndSkipGroup(ref bufferRef);
                 }
                 numIsHex = true;
             }
@@ -3724,7 +3724,7 @@ public sealed partial class RtfToTextConverter
             i >= _fldinstSymbolNumberMaxLen ||
             (!numIsHex && alphaCharsFound))
         {
-            return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+            return RewindAndSkipGroup(ref bufferRef);
         }
 
         #endregion
@@ -3739,7 +3739,7 @@ public sealed partial class RtfToTextConverter
                     NumberFormatInfo.InvariantInfo,
                     out param))
             {
-                return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                return RewindAndSkipGroup(ref bufferRef);
             }
         }
         else
@@ -3751,7 +3751,7 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                return RewindAndSkipGroup(ref bufferRef);
             }
         }
 
@@ -3759,7 +3759,7 @@ public sealed partial class RtfToTextConverter
 
         #endregion
 
-        if (ch != ' ') return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+        if (ch != ' ') return RewindAndSkipGroup(ref bufferRef);
 
         const int maxParams = 6;
 
@@ -3782,7 +3782,7 @@ public sealed partial class RtfToTextConverter
             if (ch == 'a')
             {
                 HandleFieldInst_A(param);
-                return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                return RewindAndSkipGroup(ref bufferRef);
             }
             /*
             From the spec:
@@ -3795,12 +3795,12 @@ public sealed partial class RtfToTextConverter
             else if (ch == 'j')
             {
                 HandleFieldInst_J(param);
-                return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                return RewindAndSkipGroup(ref bufferRef);
             }
             else if (ch == 'u')
             {
                 HandleFieldInst_U(param);
-                return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                return RewindAndSkipGroup(ref bufferRef);
             }
             /*
             From the spec:
@@ -3824,7 +3824,7 @@ public sealed partial class RtfToTextConverter
                 if (_isSeparatorChar[(byte)ch])
                 {
                     HandleFieldInst_F_Bare(param);
-                    return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                    return RewindAndSkipGroup(ref bufferRef);
                 }
                 else if (ch == ' ')
                 {
@@ -3832,7 +3832,7 @@ public sealed partial class RtfToTextConverter
                     if (ch != '\"')
                     {
                         HandleFieldInst_F_Bare(param);
-                        return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                        return RewindAndSkipGroup(ref bufferRef);
                     }
 
                     int fontNameCharCount = 0;
@@ -3841,7 +3841,7 @@ public sealed partial class RtfToTextConverter
                     {
                         if (fontNameCharCount >= _maxSymbolFontNameLength || _isSeparatorChar[(byte)ch])
                         {
-                            return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                            return RewindAndSkipGroup(ref bufferRef);
                         }
                         _fldinstSymbolFontName.Add(ch);
                         fontNameCharCount++;
@@ -3855,7 +3855,7 @@ public sealed partial class RtfToTextConverter
                         if (SeqEqual(_fldinstSymbolFontName, symbolChars))
                         {
                             HandleFieldInst_F_WithSymbolFontName(param, symbolFontTable);
-                            return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                            return RewindAndSkipGroup(ref bufferRef);
                         }
                     }
                 }
@@ -3881,14 +3881,14 @@ public sealed partial class RtfToTextConverter
             else if (ch == 's')
             {
                 ch = (char)GetByte(IncrementCurrentPos());
-                if (ch != ' ') return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                if (ch != ' ') return RewindAndSkipGroup(ref bufferRef);
 
                 int numDigitCount = 0;
                 while (CharExtension.IsAsciiDigit(ch = (char)GetByte(IncrementCurrentPos())))
                 {
                     if (numDigitCount > _fldinstSymbolNumberMaxLen)
                     {
-                        return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+                        return RewindAndSkipGroup(ref bufferRef);
                     }
                     numDigitCount++;
                 }
@@ -3899,14 +3899,14 @@ public sealed partial class RtfToTextConverter
 
         #endregion
 
-        return RewindAndSkipGroup(ref bufferRef, ref keywordRef);
+        return RewindAndSkipGroup(ref bufferRef);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private RtfError RewindAndSkipGroup(ref byte bufferRef, ref byte keywordRef)
+    private RtfError RewindAndSkipGroup(ref byte bufferRef)
     {
         _currentPos--;
-        SkipDest(ref bufferRef, ref keywordRef, 0);
+        SkipDest(ref bufferRef);
         return RtfError.OK;
     }
 
@@ -4474,7 +4474,7 @@ public sealed partial class RtfToTextConverter
         return RtfError.OK;
     }
 
-    private void SkipDest(ref byte bufferRef, ref byte keywordRef, int keywordLength)
+    private void SkipDest(ref byte bufferRef)
     {
         // This method should either skip the entire destination in one go, or else bail and use the slow path
         // for the rest of the destination.
@@ -4485,145 +4485,60 @@ public sealed partial class RtfToTextConverter
 
         GroupStack_CurrentSkipDest = true;
 
+        if (!System.Numerics.Vector.IsHardwareAccelerated)
+        {
+            return;
+        }
+
         int startGroupLevel = _groupStackCount;
 
         int index = _currentPos;
-        if (System.Numerics.Vector.IsHardwareAccelerated)
+        while (!_reachedEndOfStream)
         {
-            while (!_reachedEndOfStream)
-            {
-                index = SIMD_SkipDest(ref bufferRef, index, _currentBufferChunkLength - index);
+            index = SIMD_SkipDest(ref bufferRef, index, _currentBufferChunkLength - index);
 
-                /*
-                Curly braces can be escaped like \{ and \}. But there can be an arbitrary amount of backslashes
-                before a curly brace, because it could be a series of escaped backslashes and then an escaped
-                curly brace: \\\\\\\}. Which means if we encountered one, we'd have to read an arbitrary amount
-                back in the stream, which we can't do. So if we don't find the end of our subgroup stack in the
-                current buffer chunk, just give up and take the slow path that properly parses escapes.
-                */
-                if (index <= 0 ||
-                    index >= _currentBufferChunkLength ||
-                    GetByteAtPos(ref bufferRef, index - 1) == '\\')
-                {
-                    _groupStackCount = startGroupLevel;
-                    return;
-                }
-                switch (GetByteAtPos(ref bufferRef, index))
-                {
-                    case (byte)'{':
-                        ++_groupStackCount;
-                        break;
-                    case (byte)'}':
-                        --_groupStackCount;
-                        if (_groupStackCount < startGroupLevel)
-                        {
-                            _currentPos = index + 1;
-                            return;
-                        }
-                        break;
-                    // If we find \bin, run away: it could contain unescaped curly braces that are just part of
-                    // the raw binary.
-                    case (byte)'\\':
-                        if (index > _currentBufferChunkLength - _binLength ||
-                            (GetByteAtPos(ref bufferRef, index + 1) == 'b' &&
-                             GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
-                             GetByteAtPos(ref bufferRef, index + 3) == 'n'))
-                        {
-                            _groupStackCount = startGroupLevel;
-                            return;
-                        }
-                        break;
-                }
-                ++index;
-            }
-        }
-        else
-        {
             /*
-            Without SIMD, we have two options: fall back to the slow path, or use a custom non-parsing path to
-            skip byte-at-a-time and count the braces and backslashes manually.
-
-            The fallback slow path does full parsing, which means it can know when there's about to be skippable
-            data (hex or skip-number-of-bytes), and can skip it fast with Array.IndexOf().
-
-            The custom non-parsing fast path can't know about skippable data, and so can't skip it fast with
-            Array.IndexOf().
-
-            The former option is faster for files that have skippable data (the full set), but slower for files
-            that don't. The latter option is faster for files that don't have skippable data (the no-image set),
-            but slower for those that do.
-            
-            So we use a hybrid, where we do the non-parsing fast path but detect skip-data keywords in the most
-            efficient way we can, to allow the fast Array.IndexOf() skip for when we have skippable data, but
-            minimize perf loss when we don't.
+            Curly braces can be escaped like \{ and \}. But there can be an arbitrary amount of backslashes
+            before a curly brace, because it could be a series of escaped backslashes and then an escaped
+            curly brace: \\\\\\\}. Which means if we encountered one, we'd have to read an arbitrary amount
+            back in the stream, which we can't do. So if we don't find the end of our subgroup stack in the
+            current buffer chunk, just give up and take the slow path that properly parses escapes.
             */
-
-            if (keywordLength >= 4 && FoundSkipDataKeyword(ref keywordRef, 0))
+            if (index <= 0 ||
+                index >= _currentBufferChunkLength ||
+                GetByteAtPos(ref bufferRef, index - 1) == '\\')
             {
+                _groupStackCount = startGroupLevel;
                 return;
             }
-
-            for (; index < _currentBufferChunkLength - _binLength; index++)
+            switch (GetByteAtPos(ref bufferRef, index))
             {
-                char ch = (char)GetByteAtPos(ref bufferRef, index);
-                switch (ch)
-                {
-                    case '\\':
-                        byte nextChar;
-                        if (index > _currentBufferChunkLength - _binLength ||
-                            ((nextChar = GetByteAtPos(ref bufferRef, index + 1)) == 'b' &&
-                             GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
-                             GetByteAtPos(ref bufferRef, index + 3) == 'n'))
-                        {
-                            _groupStackCount = startGroupLevel;
-                            return;
-                        }
-                        else if (index < _currentBufferChunkLength - sizeof(uint) && FoundSkipDataKeyword(ref bufferRef, index + 1))
-                        {
-                            _groupStackCount = startGroupLevel;
-                            return;
-                        }
-                        else if (nextChar is (byte)'\\' or (byte)'{' or (byte)'}')
-                        {
-                            _groupStackCount = startGroupLevel;
-                            return;
-                        }
-                        break;
-                    case '{':
-                        ++_groupStackCount;
-                        break;
-                    case '}':
-                        --_groupStackCount;
-                        if (_groupStackCount < startGroupLevel)
-                        {
-                            _currentPos = index + 1;
-                            return;
-                        }
-                        break;
-                }
+                case (byte)'{':
+                    ++_groupStackCount;
+                    break;
+                case (byte)'}':
+                    --_groupStackCount;
+                    if (_groupStackCount < startGroupLevel)
+                    {
+                        _currentPos = index + 1;
+                        return;
+                    }
+                    break;
+                // If we find \bin, run away: it could contain unescaped curly braces that are just part of
+                // the raw binary.
+                case (byte)'\\':
+                    if (index > _currentBufferChunkLength - _binLength ||
+                        (GetByteAtPos(ref bufferRef, index + 1) == 'b' &&
+                         GetByteAtPos(ref bufferRef, index + 2) == 'i' &&
+                         GetByteAtPos(ref bufferRef, index + 3) == 'n'))
+                    {
+                        _groupStackCount = startGroupLevel;
+                        return;
+                    }
+                    break;
             }
-            _groupStackCount = startGroupLevel;
+            ++index;
         }
-    }
-
-    // After testing a number of different methods of keyword detection, this came out the fastest. There are
-    // only six letters our keywords can start with, so any other letter will be rejected with a single array
-    // access and a null check.
-    private bool FoundSkipDataKeyword(ref byte bufferRef, int index)
-    {
-        SkipDataKeywords? keyword = _skipDataKeywords[GetByteAtPos(ref bufferRef, index)];
-        if (keyword != null)
-        {
-            uint value = Unsafe.ReadUnaligned<uint>(ref GetRefAtPos(ref bufferRef, index));
-            if (((value & keyword.Id) != 0) ||
-                (keyword.UseExtra &&
-                 (((value & keyword.Id2) != 0) || ((value & keyword.Id3) != 0))))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     #endregion
@@ -5330,7 +5245,7 @@ public sealed partial class RtfToTextConverter
     private static Symbol? LookUpControlSymbol(byte ch) => _controlSymbols[ch];
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Symbol? LookUpControlWord(ref byte keywordRef, byte len)
+    private static Symbol? LookUpControlWord(ref byte keywordRef, byte len)
     {
         // Min word length is 1, and we're guaranteed to always be at least 1, so no need to check for >= min
         if (len <= MAX_WORD_LENGTH)
