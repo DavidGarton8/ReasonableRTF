@@ -4648,7 +4648,8 @@ public sealed partial class RtfToTextConverter
         SkipDataKeywords? keyword = _skipDataKeywords[*(byte*)_keywordMem];
         if (keyword != null)
         {
-            uint value = *(uint*)_keywordMem;
+            ref byte keywordRef = ref Unsafe.AsRef<byte>((byte*)_keywordMem);
+            uint value = Unsafe.ReadUnaligned<uint>(ref keywordRef);
             if (((value & keyword.Id) != 0) ||
                 (keyword.UseExtra &&
                  (((value & keyword.Id2) != 0) || ((value & keyword.Id3) != 0))))
