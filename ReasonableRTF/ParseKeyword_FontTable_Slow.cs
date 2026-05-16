@@ -40,7 +40,7 @@ public sealed partial class RtfToTextConverter
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, 0);
+                    SkipDest(ref bufferRef, ref GetKeywordMemRef(), 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -48,7 +48,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, ref GetKeywordMemRef(), symbol, param, hasParam, 0);
         }
         else
         {
@@ -116,14 +116,14 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                symbol = LookUpControlWord(keywordCount);
+                symbol = LookUpControlWord(ref GetKeywordMemRef(), keywordCount);
             }
 
             if (symbol == null)
             {
                 if (_skipDestinationIfUnknown)
                 {
-                    SkipDest(ref bufferRef, 0);
+                    SkipDest(ref bufferRef, ref GetKeywordMemRef(), 0);
                 }
                 _skipDestinationIfUnknown = false;
                 return RtfError.OK;
@@ -133,7 +133,7 @@ public sealed partial class RtfToTextConverter
 
             fontTableKeyword = symbol.KeywordType;
             return fontTableKeyword < KeywordType.F
-                ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, keywordCount)
+                ? DispatchKeyword(ref bufferRef, ref GetKeywordMemRef(), symbol, param, hasParam, keywordCount)
                 : RtfError.OK;
         }
     }
