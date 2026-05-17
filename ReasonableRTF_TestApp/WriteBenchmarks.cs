@@ -156,10 +156,22 @@ internal static class WriteBenchmarks
             }
         }
 
-        File.WriteAllLines(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                Path.GetFileNameWithoutExtension(tbs.FileName) + "_final.md"),
-            lines);
+        string outputFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+            Path.GetFileNameWithoutExtension(tbs.FileName) + "_final.md");
+
+        using var sw = new StreamWriter(outputFile);
+        for (int i = 0; i < lines.Count; i++)
+        {
+            // No empty last line, to make it easier to copy-paste without grabbing the empty last line by accident
+            if (i == lines.Count - 1)
+            {
+                sw.Write(lines[i]);
+            }
+            else
+            {
+                sw.WriteLine(lines[i]);
+            }
+        }
     }
 
     private static void WriteExtraCharsSet(List<string> lines, int i, char c, ExtraCharsOnColumn extra, bool relativeIndex)
