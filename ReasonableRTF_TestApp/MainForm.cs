@@ -655,10 +655,11 @@ public sealed partial class MainForm : Form
 
     private void Test1Button_Click(object sender, EventArgs e)
     {
-        // Change this when we want to re-measure the benchmark MB/s
-
         long fullBytes = GetDirectorySize(SourceSet.Full);
         long smallBytes = GetDirectorySize(SourceSet.Small);
+
+#if false
+        // Change this when we want to re-measure the benchmark MB/s
 
         Trace.WriteLine("RTB Full MB/s: " + GetMBsString(fullBytes, 3331.340));
 
@@ -671,5 +672,8 @@ public sealed partial class MainForm : Form
         Trace.WriteLine("RC Full (Streamable/Stream) MB/s: " + GetMBsString(fullBytes, 26.847));
 
         Trace.WriteLine("RC Small (Streamable/Stream) MB/s: " + GetMBsString(smallBytes, 6.415));
+#else
+        WriteBenchmarks.Write(fullBytes, smallBytes);
+#endif
     }
 }

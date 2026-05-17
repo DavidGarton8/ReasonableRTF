@@ -1,4 +1,6 @@
-﻿namespace ReasonableRTF_TestApp;
+﻿using System.Runtime.CompilerServices;
+
+namespace ReasonableRTF_TestApp;
 
 internal static class Extensions
 {
@@ -24,4 +26,7 @@ internal static class Extensions
         return bytesReadRet;
     }
 #endif
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool StartsWithO(this string str, string value) => str.StartsWith(value, StringComparison.Ordinal);
 }
