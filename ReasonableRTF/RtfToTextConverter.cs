@@ -2300,8 +2300,9 @@ public sealed partial class RtfToTextConverter
                         break;
                     case '\r':
                     case '\n':
+                    case '\0':
                         break;
-                    case not '\0':
+                    default:
                     {
                         if (!GroupStack_CurrentSkipDest &&
                             GroupStack_CurrentPropertyHidden == 0)
