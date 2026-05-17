@@ -85,6 +85,7 @@ public sealed partial class RtfToTextConverter
 
     // Cache it for perf
     private static readonly char[] LineBreakString = Environment.NewLine.ToCharArray();
+    private static readonly int LineBreakStringLength = LineBreakString.Length;
 
     // +1 to allow reading one beyond the max and then checking for it to return an error
     private readonly byte[] _keyword = new byte[_keywordMaxLen + 1];
@@ -2381,7 +2382,7 @@ public sealed partial class RtfToTextConverter
         }
         else
         {
-            return ParseKeyword_FontTable_Slow(ref bufferRef, ref keywordRef,out fontTableKeyword, out param);
+            return ParseKeyword_FontTable_Slow(ref bufferRef, ref keywordRef, out fontTableKeyword, out param);
         }
     }
 
@@ -4163,10 +4164,9 @@ public sealed partial class RtfToTextConverter
     {
         if (_options.LineBreakStyle == LineBreakStyle.EnvironmentDefault)
         {
-            int lineBreakLength = LineBreakString.Length;
             // Try to be efficient - should be branch predictor friendly with no loop overhead in the expected
             // cases.
-            switch (lineBreakLength)
+            switch (LineBreakStringLength)
             {
                 case 2:
                     int plainTextCount = _plainText.Count;
