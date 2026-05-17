@@ -26,6 +26,8 @@ public sealed partial class RtfToTextConverter
         int param = 0;
         Symbol? symbol;
 
+        ref byte keywordRef = ref bufferRef;
+
         int startingCurrentPos = _currentPos;
 
         char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
@@ -112,7 +114,7 @@ public sealed partial class RtfToTextConverter
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
             }
             else
             {
@@ -132,7 +134,7 @@ public sealed partial class RtfToTextConverter
 
         _skipDestinationIfUnknown = false;
 
-        return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+        return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
     }
 }
 #endif

@@ -1,5 +1,6 @@
 #define FenGen_ParseKeywordDuplicateDest
 
+using System.Runtime.CompilerServices;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
 using ReasonableRTF.Models.Symbols;
@@ -8,7 +9,7 @@ namespace ReasonableRTF;
 
 public sealed partial class RtfToTextConverter
 {
-    private unsafe RtfError ParseKeyword_FontTable_Slow(ref byte bufferRef, out KeywordType fontTableKeyword, out int param)
+    private unsafe RtfError ParseKeyword_FontTable_Slow(ref byte bufferRef, ref byte keywordRef, out KeywordType fontTableKeyword, out int param)
     {
         bool hasParam = false;
         param = 0;
@@ -48,7 +49,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
         }
         else
         {
@@ -57,7 +58,7 @@ public sealed partial class RtfToTextConverter
                  keywordCount < _keywordMaxLen + 1 && CharExtension.IsAsciiLetter(ch);
                  keywordCount++, ch = (char)GetByte(IncrementCurrentPos()))
             {
-                WriteByteAtPos_KeywordLookup(keywordCount, (byte)ch);
+                Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref keywordRef, (nint)keywordCount), (byte)ch);
             }
             if (keywordCount > _keywordMaxLen)
             {
@@ -105,8 +106,6 @@ public sealed partial class RtfToTextConverter
             if (ch != ' ') --_currentPos;
             // [FenGen:ScalarKeywordParseSection:Slow:Dest:End]
 
-            ref byte keywordRef = ref GetKeywordMemRef();
-
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
             if (keywordCount == 1 && keywordRef == (byte)'f')
@@ -135,7 +134,7 @@ public sealed partial class RtfToTextConverter
 
             fontTableKeyword = symbol.KeywordType;
             return fontTableKeyword < KeywordType.F
-                ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, keywordCount)
+                ? DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam)
                 : RtfError.OK;
         }
     }

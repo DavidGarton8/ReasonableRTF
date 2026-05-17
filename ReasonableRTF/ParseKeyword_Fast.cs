@@ -1,6 +1,5 @@
 #define FenGen_ParseKeywordDuplicateDest
 
-using System.Runtime.CompilerServices;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
 using ReasonableRTF.Models.Symbols;
@@ -15,6 +14,8 @@ public sealed partial class RtfToTextConverter
         bool hasParam = false;
         int param = 0;
         Symbol? symbol;
+
+        ref byte keywordRef = ref bufferRef;
 
         int startingCurrentPos = _currentPos;
 
@@ -51,7 +52,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
         }
         else
         {
@@ -107,7 +108,7 @@ public sealed partial class RtfToTextConverter
             if (ch != ' ') --_currentPos;
             // [FenGen:ScalarKeywordParseSection:Fast:Dest:End]
 
-            ref byte keywordRef = ref GetRefAtPos(ref bufferRef, startingCurrentPos);
+            keywordRef = ref GetRefAtPos(ref bufferRef, startingCurrentPos);
 
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
@@ -115,7 +116,7 @@ public sealed partial class RtfToTextConverter
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
             }
             else
             {
@@ -134,7 +135,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, keywordCount);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
         }
     }
 }

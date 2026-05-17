@@ -1,5 +1,6 @@
 ﻿#define FenGen_ParseKeywordDuplicateSource
 
+using System.Runtime.CompilerServices;
 using ReasonableRTF.Enums;
 using ReasonableRTF.Extensions;
 using ReasonableRTF.Models.Symbols;
@@ -9,7 +10,7 @@ namespace ReasonableRTF;
 public sealed partial class RtfToTextConverter
 {
     [GenAttributes.FenGen_ParseKeyword(nameof(GetByte), nameof(GetByteAtCurrentPosAndIncrement), nameof(IncrementCurrentPos), nameof(bufferRef))]
-    private unsafe RtfError ParseKeyword_Slow(ref byte bufferRef)
+    private unsafe RtfError ParseKeyword_Slow(ref byte bufferRef, ref byte keywordRef)
     {
         bool hasParam = false;
         int param = 0;
@@ -48,7 +49,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
         }
         else
         {
@@ -58,7 +59,7 @@ public sealed partial class RtfToTextConverter
                  keywordCount++, ch = (char)GetByte(IncrementCurrentPos()))
             {
                 // [FenGen:Fast:RemoveLine]
-                WriteByteAtPos_KeywordLookup(keywordCount, (byte)ch);
+                Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref keywordRef, (nint)keywordCount), (byte)ch);
             }
             if (keywordCount > _keywordMaxLen)
             {
@@ -106,15 +107,13 @@ public sealed partial class RtfToTextConverter
             if (ch != ' ') --_currentPos;
             // [FenGen:ScalarKeywordParseSection:Source:End]
 
-            ref byte keywordRef = ref GetKeywordMemRef();
-
             // 33% of hit keywords and 97% of hit single-char keywords are \f, so fast-pathing nets substantial
             // performance gain.
             if (keywordCount == 1 && keywordRef == (byte)'f')
             {
                 symbol = _fontSymbol;
                 _skipDestinationIfUnknown = false;
-                return DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0);
+                return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
             }
             else
             {
@@ -133,7 +132,7 @@ public sealed partial class RtfToTextConverter
 
             _skipDestinationIfUnknown = false;
 
-            return DispatchKeyword(ref bufferRef, symbol, param, hasParam, keywordCount);
+            return DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam);
         }
     }
 }

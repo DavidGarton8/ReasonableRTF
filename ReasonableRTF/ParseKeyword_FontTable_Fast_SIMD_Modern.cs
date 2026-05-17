@@ -16,6 +16,8 @@ public sealed partial class RtfToTextConverter
         Symbol? symbol;
         fontTableKeyword = default;
 
+        ref byte keywordRef = ref bufferRef;
+
         int startingCurrentPos = _currentPos;
 
         char ch = (char)GetByteAtCurrentPosAndIncrement(ref bufferRef);
@@ -125,7 +127,7 @@ public sealed partial class RtfToTextConverter
 
         fontTableKeyword = symbol.KeywordType;
         return fontTableKeyword < KeywordType.F
-            ? DispatchKeyword(ref bufferRef, symbol, param, hasParam, 0)
+            ? DispatchKeyword(ref bufferRef, ref keywordRef, symbol, param, hasParam)
             : RtfError.OK;
     }
 }
