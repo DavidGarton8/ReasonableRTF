@@ -93,7 +93,7 @@ public sealed partial class RtfToTextConverter
                 int terminatingCharIndex = BitOperations.TrailingZeroCount(equalsTerminatingChar.ExtractMostSignificantBits());
                 ch = (char)vector[terminatingCharIndex];
 
-                if (EarlyOut(terminatingCharIndex, ch))
+                if (EarlyOut(terminatingCharIndex))
                 {
                     currentPos += ch == ';' ? terminatingCharIndex + 1 : terminatingCharIndex;
                     return SymbolFont.None;
@@ -110,7 +110,7 @@ public sealed partial class RtfToTextConverter
                 ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector512<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
-                    if (EarlyOut(Vector512<byte>.Count, ch))
+                    if (EarlyOut(Vector512<byte>.Count))
                     {
                         currentPos += ch == ';' ? Vector512<byte>.Count + 1 : Vector512<byte>.Count;
                         return SymbolFont.None;
@@ -153,7 +153,7 @@ public sealed partial class RtfToTextConverter
                 int terminatingCharIndex = BitOperations.TrailingZeroCount(equalsTerminatingChar.ExtractMostSignificantBits());
                 ch = (char)vector[terminatingCharIndex];
 
-                if (EarlyOut(terminatingCharIndex, ch))
+                if (EarlyOut(terminatingCharIndex))
                 {
                     currentPos += ch == ';' ? terminatingCharIndex + 1 : terminatingCharIndex;
                     return SymbolFont.None;
@@ -170,7 +170,7 @@ public sealed partial class RtfToTextConverter
                 ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector256<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
-                    if (EarlyOut(Vector256<byte>.Count, ch))
+                    if (EarlyOut(Vector256<byte>.Count))
                     {
                         currentPos += ch == ';' ? Vector256<byte>.Count + 1 : Vector256<byte>.Count;
                         return SymbolFont.None;
@@ -213,7 +213,7 @@ public sealed partial class RtfToTextConverter
                 int terminatingCharIndex = BitOperations.TrailingZeroCount(equalsTerminatingChar.ExtractMostSignificantBits());
                 ch = (char)vector[terminatingCharIndex];
 
-                if (EarlyOut(terminatingCharIndex, ch))
+                if (EarlyOut(terminatingCharIndex))
                 {
                     currentPos += ch == ';' ? terminatingCharIndex + 1 : terminatingCharIndex;
                     return SymbolFont.None;
@@ -230,7 +230,7 @@ public sealed partial class RtfToTextConverter
                 ch = (char)GetByteAtPos(ref bufferRef, currentPos + Vector128<byte>.Count);
                 if (ch == ';' || _isNonPlainText[(byte)ch])
                 {
-                    if (EarlyOut(Vector128<byte>.Count, ch))
+                    if (EarlyOut(Vector128<byte>.Count))
                     {
                         currentPos += ch == ';' ? Vector128<byte>.Count + 1 : Vector128<byte>.Count;
                         return SymbolFont.None;
@@ -260,7 +260,7 @@ public sealed partial class RtfToTextConverter
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool EarlyOut(int index, char ch)
+        static bool EarlyOut(int index)
         {
             return !index.IsBetween(_minSupportedSymbolFontNameLength, _maxSupportedSymbolFontNameLength) ||
                    !_symbolFontNameLengths[index];

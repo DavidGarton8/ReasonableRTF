@@ -474,7 +474,7 @@ public sealed partial class MainForm : Form
 
     private void ConvertOnlyWithRichTextBoxButton_Click(object sender, EventArgs e)
     {
-        MainForm.ConvertWithRichTextBox(SourceSet.Full);
+        ConvertWithRichTextBox(SourceSet.Full);
     }
 
     private void ConvertOnlyWithCustomButton_Click(object sender, EventArgs e)
@@ -493,7 +493,7 @@ public sealed partial class MainForm : Form
 
     private void ConvertOnlyWithRichTextBox_Small_Button_Click(object sender, EventArgs e)
     {
-        MainForm.ConvertWithRichTextBox(SourceSet.Small);
+        ConvertWithRichTextBox(SourceSet.Small);
     }
 
     private void ConvertOnlyWithCustom_Small_Button_Click(object sender, EventArgs e)

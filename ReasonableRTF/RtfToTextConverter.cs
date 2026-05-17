@@ -50,7 +50,6 @@ system "ansi" codepage, we would then have to choose something explicit anyway, 
 */
 
 using System.Buffers;
-using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -148,30 +147,6 @@ public sealed partial class RtfToTextConverter
     private readonly ulong _SYMBOLKeywordAsULong_Mask = BitConverter.IsLittleEndian
         ? 0x00_FF_FF_FF_FF_FF_FF_FFul
         : 0xFF_FF_FF_FF_FF_FF_FF_00ul;
-
-    private sealed class SkipDataKeywords
-    {
-        internal readonly uint Id;
-        internal readonly bool UseExtra;
-        internal readonly uint Id2;
-        internal readonly uint Id3;
-
-        public SkipDataKeywords(uint id)
-        {
-            Id = id;
-            UseExtra = false;
-            Id2 = 0;
-            Id3 = 0;
-        }
-
-        public SkipDataKeywords(uint id, uint id2, uint id3)
-        {
-            Id = id;
-            UseExtra = true;
-            Id2 = id2;
-            Id3 = id3;
-        }
-    }
 
     #region Tables
 
@@ -1857,37 +1832,6 @@ public sealed partial class RtfToTextConverter
         false, false, false, false, false, false, false, false, false, false,
     ];
 
-    // For the non-SIMD fast destination skip code.
-    private static SkipDataKeywords?[] InitSkipDataKeywords()
-    {
-        SkipDataKeywords?[] ret = new SkipDataKeywords?[256];
-
-        const uint blipBytes = 0x70696C62;
-        const uint coloBytes = 0x6F6C6F63;
-        const uint dataBytes = 0x61746164;
-        const uint objdBytes = 0x646A626F;
-        const uint panoBytes = 0x6F6E6170;
-        const uint passBytes = 0x73736170;
-        const uint pictBytes = 0x74636970;
-        const uint themBytes = 0x6D656874;
-
-        ret['b'] = new SkipDataKeywords(GetBytes(blipBytes));
-        ret['c'] = new SkipDataKeywords(GetBytes(coloBytes));
-        ret['d'] = new SkipDataKeywords(GetBytes(dataBytes));
-        ret['o'] = new SkipDataKeywords(GetBytes(objdBytes));
-        ret['p'] = new SkipDataKeywords(GetBytes(panoBytes), GetBytes(passBytes), GetBytes(pictBytes));
-        ret['t'] = new SkipDataKeywords(GetBytes(themBytes));
-
-        return ret;
-
-        static uint GetBytes(uint bytes)
-        {
-            return !BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(bytes) : bytes;
-        }
-    }
-
-    private static readonly SkipDataKeywords?[] _skipDataKeywords = InitSkipDataKeywords();
-
     #endregion
 
     #region Resettables
@@ -2567,7 +2511,7 @@ public sealed partial class RtfToTextConverter
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool ShouldUseSimdFontNameCodePath()
+    private static bool ShouldUseSimdFontNameCodePath()
     {
 #if NET8_0_OR_GREATER
         return System.Runtime.Intrinsics.Vector512.IsHardwareAccelerated ||
