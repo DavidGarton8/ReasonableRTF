@@ -4,40 +4,12 @@ using System.Globalization;
 using System.IO.Compression;
 using ReasonableRTF;
 using ReasonableRTF.Models;
+using static ReasonableRTF_TestApp.FileSetLocator;
 
 namespace ReasonableRTF_TestApp;
 
 public sealed partial class MainForm : Form
 {
-    private const string _configFile = "Config.ini";
-
-    private const string _rtfFullSetDir = "RTF_Test_Set_Full";
-    private const string _rtfSmallSetDir = "RTF_Test_Set_Small";
-    private const string _rftValidityTestDir = "Validity_Test_Files";
-    private const string _workingNewSetDir = "WorkingNewSet";
-
-    private const string _outputCustomDir = "Output_Custom";
-    private const string _outputRichTextBoxDir = "Output_RichTextBox";
-
-    private const string _rtfValidityTestOutputCustomDir = "Output_Validity_Test_Custom";
-    private const string _rtfValidityTestOutputRichTextBoxDir = "Output_Validity_Test_RichTextBox";
-
-    private const string _outputWorkingNewSetCustomDir = "Output_WorkingNewSet_Custom";
-    private const string _outputWorkingNewSetRichTextBoxDir = "Output_WorkingNewSet_RichTextBox";
-
-    private const string DeflateStreamTest_Full_FileName = "DeflateStreamTest_Full.zip";
-    private const string DeflateStreamTest_Small_FileName = "DeflateStreamTest_Small.zip";
-    private const string DeflateStreamTest_Validity_Test_Files_FileName = "DeflateStreamTest_Validity_Test_Files.zip";
-    private const string DeflateStreamTest_WorkingNewSet_FileName = "DeflateStreamTest_WorkingNewSet.zip";
-
-    private enum SourceSet
-    {
-        Full,
-        Small,
-        ValidityTest,
-        WorkingNewSet,
-    }
-
     private sealed class TimingScope : IDisposable
     {
         private readonly Stopwatch _stopWatch = new();
@@ -59,78 +31,11 @@ public sealed partial class MainForm : Form
     public MainForm()
     {
         InitializeComponent();
-        LoadConfig();
     }
 
     private void MainForm_Shown(object sender, EventArgs e)
     {
         ConvertOnlyWithCustomButton.Focus();
-    }
-
-    private void LoadConfig()
-    {
-        try
-        {
-            string configFile = Path.Combine(Application.StartupPath, _configFile);
-            string[] lines = File.ReadAllLines(configFile);
-            for (int i = 0; i < lines.Length; i++)
-            {
-                string lineT = lines[i].Trim();
-                if (lineT.StartsWith("DataDir=", StringComparison.Ordinal))
-                {
-                    DataDirTextBox.Text = lineT["DataDir=".Length..];
-                }
-            }
-            return;
-        }
-        catch
-        {
-            // ignore
-        }
-
-        ResetDataDir();
-    }
-
-    private void ResetDataDir()
-    {
-        const string defaultDir = @"..\..\..\Data";
-
-        try
-        {
-            string finalDir = Path.GetFullPath(defaultDir);
-
-            if (Directory.Exists(finalDir))
-            {
-                DataDirTextBox.Text = finalDir;
-            }
-        }
-        catch
-        {
-            DataDirTextBox.Clear();
-        }
-        finally
-        {
-            SaveConfig();
-        }
-    }
-
-    private void SaveConfig()
-    {
-        try
-        {
-            string configFile = Path.Combine(Application.StartupPath, _configFile);
-            using StreamWriter sw = new(configFile);
-            sw.WriteLine("DataDir=" + DataDirTextBox.Text);
-        }
-        catch
-        {
-            MessageBox.Show("Couldn't save config file.");
-        }
-    }
-
-    private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
-    {
-        SaveConfig();
     }
 
     private static string GetMBsString(long totalSize, double elapsedMilliseconds)
@@ -148,22 +53,10 @@ public sealed partial class MainForm : Form
             GetMBsString(totalSize, sw.ElapsedMilliseconds));
     }
 
-    private string GetRtfSetDir(SourceSet sourceSet)
-    {
-        string dir = sourceSet switch
-        {
-            SourceSet.Full => _rtfFullSetDir,
-            SourceSet.Small => _rtfSmallSetDir,
-            SourceSet.WorkingNewSet => _workingNewSetDir,
-            _ => _rftValidityTestDir,
-        };
-        return Path.Combine(DataDirTextBox.Text, dir);
-    }
-
-    private (string[] RtfFiles, MemoryStream[] MemStreams, long TotalSize)
+    private static (string[] RtfFiles, MemoryStream[] MemStreams, long TotalSize)
     GetStuff_RichTextBox(SourceSet sourceSet)
     {
-        string[] rtfFiles = Directory.GetFiles(GetRtfSetDir(sourceSet));
+        string[] rtfFiles = Directory.GetFiles(GetFileSet(sourceSet));
         MemoryStream[] memStreams = new MemoryStream[rtfFiles.Length];
 
         long totalSize = 0;
@@ -181,10 +74,10 @@ public sealed partial class MainForm : Form
         return (rtfFiles, memStreams, totalSize);
     }
 
-    private (string[] RtfFiles, byte[][] ByteArrays, long TotalSize)
+    private static (string[] RtfFiles, byte[][] ByteArrays, long TotalSize)
     GetStuff_Custom(SourceSet sourceSet)
     {
-        string[] rtfFiles = Directory.GetFiles(GetRtfSetDir(sourceSet));
+        string[] rtfFiles = Directory.GetFiles(GetFileSet(sourceSet));
 
         byte[][] byteArrays = new byte[rtfFiles.Length][];
 
@@ -275,7 +168,7 @@ public sealed partial class MainForm : Form
         }
         else if (Convert_DeflateStreamRadioButton.Checked)
         {
-            string zipFile = Path.Combine(DataDirTextBox.Text, GetDeflateStreamTestFileName(sourceSet));
+            string zipFile = Path.Combine(DataDir, GetDeflateStreamTestFileName(sourceSet));
             using FileStream zipFileStream = File.OpenRead(zipFile);
             using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Read);
 
@@ -305,7 +198,7 @@ public sealed partial class MainForm : Form
         _ => throw new Exception("No deflate stream test file for the set " + sourceSet),
     };
 
-    private void ConvertWithCustom20x(SourceSet sourceSet)
+    private static void ConvertWithCustom20x(SourceSet sourceSet)
     {
         (_, byte[][] byteArrays, long totalSize) = GetStuff_Custom(sourceSet);
         RtfToTextConverter rtfConverter = new();
@@ -322,7 +215,7 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void ConvertWithRichTextBox(SourceSet sourceSet)
+    private static void ConvertWithRichTextBox(SourceSet sourceSet)
     {
         (_, MemoryStream[] memStreams, long totalSize) = GetStuff_RichTextBox(sourceSet);
         using RichTextBox rtfBox = new();
@@ -347,14 +240,14 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private void WritePlaintextFile(string f, string text, string destDir, SourceSet sourceSet)
+    private static void WritePlaintextFile(string f, string text, string destDir, SourceSet sourceSet)
     {
-        string ff = f.Substring(GetRtfSetDir(sourceSet).Length).Replace("\\", "__").Replace("/", "__");
+        string ff = f.Substring(GetFileSet(sourceSet).Length).Replace("\\", "__").Replace("/", "__");
         ff = Path.GetFileNameWithoutExtension(ff) + "_rtf_to_plaintext.txt";
-        File.WriteAllText(Path.Combine(DataDirTextBox.Text, destDir, ff), text);
+        File.WriteAllText(Path.Combine(DataDir, destDir, ff), text);
     }
 
-    private void HandleOne(bool write)
+    private static void HandleOne(bool write)
     {
         RtfToTextConverter rtfConverter = new();
 
@@ -384,7 +277,7 @@ public sealed partial class MainForm : Form
             ;
         SourceSet sourceSet = SourceSet.ValidityTest;
 
-        string finalFile = Path.Combine(GetRtfSetDir(sourceSet), file);
+        string finalFile = Path.Combine(GetFileSet(sourceSet), file);
 
         using FileStream fs = File.OpenRead(finalFile);
         byte[] array = new byte[fs.Length];
@@ -407,7 +300,7 @@ public sealed partial class MainForm : Form
 
     #region Convert and write
 
-    private void ConvertAndWrite_RichTextBox(SourceSet sourceSet, string outputDir)
+    private static void ConvertAndWrite_RichTextBox(SourceSet sourceSet, string outputDir)
     {
         (string[] rtfFiles, MemoryStream[] memStreams, long totalSize) = GetStuff_RichTextBox(sourceSet);
         using RichTextBox rtfBox = new();
@@ -522,8 +415,8 @@ public sealed partial class MainForm : Form
         }
         else if (Convert_DeflateStreamRadioButton.Checked)
         {
-            string setDir = GetRtfSetDir(sourceSet);
-            string zipFile = Path.Combine(DataDirTextBox.Text, GetDeflateStreamTestFileName(sourceSet));
+            string setDir = GetFileSet(sourceSet);
+            string zipFile = Path.Combine(DataDir, GetDeflateStreamTestFileName(sourceSet));
             using FileStream zipFileStream = File.OpenRead(zipFile);
             using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Read);
 
@@ -581,7 +474,7 @@ public sealed partial class MainForm : Form
 
     private void ConvertOnlyWithRichTextBoxButton_Click(object sender, EventArgs e)
     {
-        ConvertWithRichTextBox(SourceSet.Full);
+        MainForm.ConvertWithRichTextBox(SourceSet.Full);
     }
 
     private void ConvertOnlyWithCustomButton_Click(object sender, EventArgs e)
@@ -600,7 +493,7 @@ public sealed partial class MainForm : Form
 
     private void ConvertOnlyWithRichTextBox_Small_Button_Click(object sender, EventArgs e)
     {
-        ConvertWithRichTextBox(SourceSet.Small);
+        MainForm.ConvertWithRichTextBox(SourceSet.Small);
     }
 
     private void ConvertOnlyWithCustom_Small_Button_Click(object sender, EventArgs e)
@@ -629,23 +522,10 @@ public sealed partial class MainForm : Form
 
     #endregion
 
-    private void DataDirBrowseButton_Click(object sender, EventArgs e)
-    {
-        using FolderBrowserDialog dialog = new();
-        DialogResult result = dialog.ShowDialog(this);
-        if (result != DialogResult.OK) return;
-        DataDirTextBox.Text = dialog.SelectedPath;
-    }
-
-    private void DataDirResetButton_Click(object sender, EventArgs e)
-    {
-        ResetDataDir();
-    }
-
-    private long GetDirectorySize(SourceSet sourceSet)
+    private static long GetDirectorySize(SourceSet sourceSet)
     {
         long totalSize = 0;
-        DirectoryInfo di = new(GetRtfSetDir(sourceSet));
+        DirectoryInfo di = new(GetFileSet(sourceSet));
         foreach (FileInfo fi in di.EnumerateFiles())
         {
             totalSize += fi.Length;
