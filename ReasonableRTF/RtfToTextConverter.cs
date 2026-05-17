@@ -2863,7 +2863,7 @@ public sealed partial class RtfToTextConverter
 
     #region Hex
 
-    private void AddHexBuffer(bool success, bool codePageWas42, Encoding? enc, in FontEntry fontEntry)
+    private void AddHexBuffer(bool codePageWas42, Encoding? enc, in FontEntry fontEntry)
     {
         // If multiple hex chars are directly after another (eg. \'81\'63) then they may be representing one
         // multibyte character (or not, they may also just be two single-byte chars in a row). To deal with
@@ -2871,92 +2871,84 @@ public sealed partial class RtfToTextConverter
         // the buffer to the current encoding's byte-to-char decoder and get our correct result.
 
         ListFast<char> finalChars = _charGeneralBuffer;
-        if (!success)
+        // DON'T try to combine this byte with the next one if we're on code page 42 (symbol font translation) -
+        // then we're guaranteed to be single-byte, and combining won't give a correct result
+        if (codePageWas42)
         {
-            SetListFastToUnknownChar(finalChars);
-            AddChars(finalChars, finalChars.Count);
-        }
-        else
-        {
-            // DON'T try to combine this byte with the next one if we're on code page 42 (symbol font translation) -
-            // then we're guaranteed to be single-byte, and combining won't give a correct result
-            if (codePageWas42)
+            if (!fontEntry.IsSet)
             {
-                if (!fontEntry.IsSet)
+                for (int i = 0; i < _hexBuffer.Count; i++)
+                {
+                    byte codePoint = _hexBuffer.ItemsArray[i];
+                    GetCharFromConversionList_Byte(codePoint, _symbolFontTables[(int)SymbolFont.Symbol], out finalChars);
+                    if (finalChars.Count == 0)
+                    {
+                        SetListFastToUnknownChar(finalChars);
+                    }
+                    AddChars(finalChars, finalChars.Count);
+                }
+            }
+            else
+            {
+                SymbolFont symbolFont = fontEntry.SymbolFont;
+                if (symbolFont > SymbolFont.Unset)
                 {
                     for (int i = 0; i < _hexBuffer.Count; i++)
                     {
                         byte codePoint = _hexBuffer.ItemsArray[i];
-                        GetCharFromConversionList_Byte(codePoint, _symbolFontTables[(int)SymbolFont.Symbol], out finalChars);
-                        if (finalChars.Count == 0)
+                        GetCharFromConversionList_Byte(codePoint, _symbolFontTables[(int)symbolFont], out finalChars);
+                        AddChars(finalChars, finalChars.Count);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < _hexBuffer.Count; i++)
+                    {
+                        try
+                        {
+                            if (enc != null)
+                            {
+                                int sourceBufferCount = _hexBuffer.Count;
+                                finalChars.EnsureCapacity(sourceBufferCount);
+                                finalChars.Count = enc
+                                    .GetChars(_hexBuffer.ItemsArray, 0, sourceBufferCount,
+                                        finalChars.ItemsArray, 0);
+                            }
+                            else
+                            {
+                                SetListFastToUnknownChar(finalChars);
+                            }
+                        }
+                        catch
                         {
                             SetListFastToUnknownChar(finalChars);
                         }
                         AddChars(finalChars, finalChars.Count);
                     }
                 }
-                else
-                {
-                    SymbolFont symbolFont = fontEntry.SymbolFont;
-                    if (symbolFont > SymbolFont.Unset)
-                    {
-                        for (int i = 0; i < _hexBuffer.Count; i++)
-                        {
-                            byte codePoint = _hexBuffer.ItemsArray[i];
-                            GetCharFromConversionList_Byte(codePoint, _symbolFontTables[(int)symbolFont], out finalChars);
-                            AddChars(finalChars, finalChars.Count);
-                        }
-                    }
-                    else
-                    {
-                        for (int i = 0; i < _hexBuffer.Count; i++)
-                        {
-                            try
-                            {
-                                if (enc != null)
-                                {
-                                    int sourceBufferCount = _hexBuffer.Count;
-                                    finalChars.EnsureCapacity(sourceBufferCount);
-                                    finalChars.Count = enc
-                                        .GetChars(_hexBuffer.ItemsArray, 0, sourceBufferCount,
-                                            finalChars.ItemsArray, 0);
-                                }
-                                else
-                                {
-                                    SetListFastToUnknownChar(finalChars);
-                                }
-                            }
-                            catch
-                            {
-                                SetListFastToUnknownChar(finalChars);
-                            }
-                            AddChars(finalChars, finalChars.Count);
-                        }
-                    }
-                }
             }
-            else
+        }
+        else
+        {
+            try
             {
-                try
+                if (enc != null)
                 {
-                    if (enc != null)
-                    {
-                        int sourceBufferCount = _hexBuffer.Count;
-                        finalChars.EnsureCapacity(sourceBufferCount);
-                        finalChars.Count = enc
-                            .GetChars(_hexBuffer.ItemsArray, 0, sourceBufferCount, finalChars.ItemsArray, 0);
-                    }
-                    else
-                    {
-                        SetListFastToUnknownChar(finalChars);
-                    }
+                    int sourceBufferCount = _hexBuffer.Count;
+                    finalChars.EnsureCapacity(sourceBufferCount);
+                    finalChars.Count = enc
+                        .GetChars(_hexBuffer.ItemsArray, 0, sourceBufferCount, finalChars.ItemsArray, 0);
                 }
-                catch
+                else
                 {
                     SetListFastToUnknownChar(finalChars);
                 }
-                AddChars(finalChars, finalChars.Count);
             }
+            catch
+            {
+                SetListFastToUnknownChar(finalChars);
+            }
+            AddChars(finalChars, finalChars.Count);
         }
     }
 
@@ -2964,7 +2956,7 @@ public sealed partial class RtfToTextConverter
     {
         _hexBuffer.ClearFast();
 
-        (bool success, bool codePageWas42, Encoding? enc, FontEntry fontEntry) = GetCurrentEncoding();
+        (bool codePageWas42, Encoding? enc, FontEntry fontEntry) = GetCurrentEncoding();
 
         byte byte1;
         byte byte2;
@@ -2998,7 +2990,7 @@ public sealed partial class RtfToTextConverter
                 else
                 {
                     _currentPos -= 2;
-                    AddHexBuffer(success, codePageWas42, enc, in fontEntry);
+                    AddHexBuffer(codePageWas42, enc, in fontEntry);
                     return;
                 }
             }
@@ -3006,7 +2998,7 @@ public sealed partial class RtfToTextConverter
             else if (b is not (byte)'\r' and not (byte)'\n')
             {
                 _currentPos--;
-                AddHexBuffer(success, codePageWas42, enc, in fontEntry);
+                AddHexBuffer(codePageWas42, enc, in fontEntry);
                 return;
             }
         }
@@ -3026,7 +3018,7 @@ public sealed partial class RtfToTextConverter
                 else
                 {
                     _currentPos -= 2;
-                    AddHexBuffer(success, codePageWas42, enc, in fontEntry);
+                    AddHexBuffer(codePageWas42, enc, in fontEntry);
                     return;
                 }
             }
@@ -3034,7 +3026,7 @@ public sealed partial class RtfToTextConverter
             else if (b is not (byte)'\r' and not (byte)'\n')
             {
                 _currentPos--;
-                AddHexBuffer(success, codePageWas42, enc, in fontEntry);
+                AddHexBuffer(codePageWas42, enc, in fontEntry);
                 return;
             }
         }
@@ -3883,7 +3875,7 @@ public sealed partial class RtfToTextConverter
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private (bool Success, bool CodePageWas42, Encoding? Encoding, FontEntry FontEntry)
+    private (bool CodePageWas42, Encoding? Encoding, FontEntry FontEntry)
     GetCurrentEncoding()
     {
         int groupFontNum = GroupStack_CurrentPropertyFontNum;
@@ -3904,7 +3896,7 @@ public sealed partial class RtfToTextConverter
             codePage = fontEntry.IsSet ? fontEntry.CodePage : _headerCodePage;
         }
 
-        if (codePage == 42) return (true, true, null, fontEntry);
+        if (codePage == 42) return (true, null, fontEntry);
 
         // Awful, but we're based on nice, relaxing error returns, so we don't want to throw exceptions. Ever.
         Encoding enc;
@@ -3917,7 +3909,7 @@ public sealed partial class RtfToTextConverter
             enc = _windows1252Encoding;
         }
 
-        return (true, false, enc, fontEntry);
+        return (false, enc, fontEntry);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -4065,8 +4057,8 @@ public sealed partial class RtfToTextConverter
             }
             else
             {
-                (bool success, _, Encoding? enc, _) = GetCurrentEncoding();
-                if (success && enc != null)
+                (_, Encoding? enc, _) = GetCurrentEncoding();
+                if (enc != null)
                 {
                     _charGeneralBuffer.Count = enc
                         .GetChars(_byteBuffer4, 0, 4, _charGeneralBuffer.ItemsArray, 0);
